@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Home, Users, Key, Hash } from 'lucide-react';
 import { roomService } from '../services/rooms';
+import RoomJoinCelebration from './RoomJoinCelebration';
 
 const JoinRoom = ({ onRoomJoined }) => {
     const [formData, setFormData] = useState({
@@ -9,10 +10,12 @@ const JoinRoom = ({ onRoomJoined }) => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showCelebration, setShowCelebration] = useState(false);
+    const [roomData, setRoomData] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!formData.roomId.trim()) {
             setError('Room ID is required');
             return;
@@ -26,17 +29,26 @@ const JoinRoom = ({ onRoomJoined }) => {
                 formData.roomId.trim(),
                 formData.roomNumber.trim() || null
             );
-            
-            // Call the callback to indicate successful room joining
-            onRoomJoined(response);
+
+            // Show celebration animation
+            setRoomData(response);
+            setShowCelebration(true);
         } catch (error) {
             console.error('Error joining room:', error);
-            // Use the error message from the service, which now includes the detail
             setError(error.message || 'Failed to join room. Please try again.');
         } finally {
             setLoading(false);
         }
     };
+
+    const handleCelebrationComplete = () => {
+        // After celebration, call the callback to redirect to dashboard
+        onRoomJoined(roomData);
+    };
+
+    if (showCelebration && roomData) {
+        return <RoomJoinCelebration roomData={roomData} onComplete={handleCelebrationComplete} />;
+    }
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -75,7 +87,7 @@ const JoinRoom = ({ onRoomJoined }) => {
                     }}>
                         <Users size={36} style={{ color: 'var(--color-sage-green)' }} />
                     </div>
-                    
+
                     <h1 style={{
                         fontSize: '28px',
                         fontWeight: '700',
@@ -84,23 +96,23 @@ const JoinRoom = ({ onRoomJoined }) => {
                     }}>
                         Join Your Community
                     </h1>
-                    
+
                     <p style={{
                         fontSize: '16px',
                         color: '#666',
                         lineHeight: '1.5',
                         marginBottom: '8px'
                     }}>
-                        Welcome to our community growth and wellness platform! 
+                        Welcome to our community growth and wellness platform!
                         We allow only authenticated community members.
                     </p>
-                    
+
                     <p style={{
                         fontSize: '14px',
                         color: '#888',
                         lineHeight: '1.4'
                     }}>
-                        If you're already in the community, ask your admin to share the Room ID 
+                        If you're already in the community, ask your admin to share the Room ID
                         and please enter your room number for identification.
                     </p>
                 </div>
@@ -157,9 +169,9 @@ const JoinRoom = ({ onRoomJoined }) => {
                             onFocus={(e) => e.target.style.borderColor = 'var(--color-sage-green)'}
                             onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
                         />
-                        <div style={{ 
-                            fontSize: '12px', 
-                            color: '#999', 
+                        <div style={{
+                            fontSize: '12px',
+                            color: '#999',
                             marginTop: '4px',
                             fontStyle: 'italic'
                         }}>
@@ -199,9 +211,9 @@ const JoinRoom = ({ onRoomJoined }) => {
                             onFocus={(e) => e.target.style.borderColor = 'var(--color-sage-green)'}
                             onBlur={(e) => e.target.style.borderColor = '#e5e5e5'}
                         />
-                        <div style={{ 
-                            fontSize: '12px', 
-                            color: '#999', 
+                        <div style={{
+                            fontSize: '12px',
+                            color: '#999',
                             marginTop: '4px',
                             fontStyle: 'italic'
                         }}>
@@ -263,17 +275,17 @@ const JoinRoom = ({ onRoomJoined }) => {
                     color: '#666',
                     textAlign: 'left'
                 }}>
-                    <h4 style={{ 
-                        fontSize: '14px', 
-                        fontWeight: '600', 
+                    <h4 style={{
+                        fontSize: '14px',
+                        fontWeight: '600',
                         marginBottom: '8px',
                         color: 'var(--color-charcoal)'
                     }}>
                         Need Help?
                     </h4>
-                    <ul style={{ 
-                        listStyle: 'none', 
-                        padding: 0, 
+                    <ul style={{
+                        listStyle: 'none',
+                        padding: 0,
                         margin: 0,
                         lineHeight: '1.6'
                     }}>
