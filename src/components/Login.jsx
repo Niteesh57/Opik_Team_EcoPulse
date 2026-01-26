@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Leaf, User, Mail, Lock, ArrowRight } from 'lucide-react';
 import { authService } from '../services/auth';
+import OnboardingGuide from './OnboardingGuide';
 
 const Login = ({ onLogin }) => {
     const [isSignup, setIsSignup] = useState(false);
@@ -14,6 +15,10 @@ const Login = ({ onLogin }) => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showOnboarding, setShowOnboarding] = useState(() => {
+        // Check if user has seen onboarding before
+        return !localStorage.getItem('ecopulse_onboarding_completed');
+    });
 
     const totalFrames = 11;
 
@@ -78,6 +83,16 @@ const Login = ({ onLogin }) => {
         }
     };
 
+    const handleOnboardingComplete = () => {
+        localStorage.setItem('ecopulse_onboarding_completed', 'true');
+        setShowOnboarding(false);
+    };
+
+    const handleOnboardingSkip = () => {
+        localStorage.setItem('ecopulse_onboarding_completed', 'true');
+        setShowOnboarding(false);
+    };
+
     const inputStyle = {
         width: '100%',
         padding: '12px 12px 12px 40px',
@@ -91,6 +106,11 @@ const Login = ({ onLogin }) => {
         transition: 'all 0.3s ease',
         boxSizing: 'border-box'
     };
+
+    // Show onboarding if user hasn't seen it
+    if (showOnboarding) {
+        return <OnboardingGuide onComplete={handleOnboardingComplete} onSkip={handleOnboardingSkip} />;
+    }
 
     return (
         <div style={{
