@@ -99,7 +99,7 @@ function AppContent() {
         path="/join-room"
         element={
           user && user.role === 'user' && !roomStatus?.hasRoom ? (
-            <JoinRoom onRoomJoined={handleRoomJoined} />
+            <JoinRoom onRoomJoined={handleRoomJoined} onLogout={handleLogout} />
           ) : (
             user ? (
               user.role === 'admin' ?

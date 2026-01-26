@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Home, Users, Key, Hash } from 'lucide-react';
+import { Home, Users, Key, Hash, LogOut, AlertCircle } from 'lucide-react';
 import { roomService } from '../services/rooms';
 import RoomJoinCelebration from './RoomJoinCelebration';
 
-const JoinRoom = ({ onRoomJoined }) => {
+const JoinRoom = ({ onRoomJoined, onLogout }) => {
     const [formData, setFormData] = useState({
         roomId: '',
         roomNumber: ''
@@ -12,6 +12,7 @@ const JoinRoom = ({ onRoomJoined }) => {
     const [error, setError] = useState('');
     const [showCelebration, setShowCelebration] = useState(false);
     const [roomData, setRoomData] = useState(null);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -46,6 +47,19 @@ const JoinRoom = ({ onRoomJoined }) => {
         onRoomJoined(roomData);
     };
 
+    const handleLogoutClick = () => {
+        setShowLogoutConfirm(true);
+    };
+
+    const handleLogoutConfirm = () => {
+        setShowLogoutConfirm(false);
+        onLogout();
+    };
+
+    const handleLogoutCancel = () => {
+        setShowLogoutConfirm(false);
+    };
+
     if (showCelebration && roomData) {
         return <RoomJoinCelebration roomData={roomData} onComplete={handleCelebrationComplete} />;
     }
@@ -62,8 +76,147 @@ const JoinRoom = ({ onRoomJoined }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px'
+            padding: '20px',
+            position: 'relative'
         }}>
+            {/* Logout Button */}
+            <button
+                onClick={handleLogoutClick}
+                style={{
+                    position: 'absolute',
+                    top: '20px',
+                    right: '20px',
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '48px',
+                    height: '48px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    backdropFilter: 'blur(10px)'
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                }}
+            >
+                <LogOut size={20} color="white" />
+            </button>
+
+            {/* Logout Confirmation Popup */}
+            {showLogoutConfirm && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '32px',
+                        maxWidth: '400px',
+                        width: '100%',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            background: '#FFF3E0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px'
+                        }}>
+                            <AlertCircle size={32} color="#FF9800" />
+                        </div>
+                        <h3 style={{
+                            fontSize: '20px',
+                            fontWeight: '700',
+                            color: 'var(--color-charcoal)',
+                            marginBottom: '12px'
+                        }}>
+                            Just a Friendly Reminder!
+                        </h3>
+                        <p style={{
+                            fontSize: '14px',
+                            color: '#666',
+                            lineHeight: '1.6',
+                            marginBottom: '24px'
+                        }}>
+                            EcoPulse is designed for apartment and community residents. To access the platform, you'll need a <strong>Room ID from your community admin</strong>.
+                            <br /><br />
+                            If you don't have a Room ID yet, please contact your apartment or community administrator.
+                        </p>
+                        <div style={{
+                            display: 'flex',
+                            gap: '12px',
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={handleLogoutCancel}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 24px',
+                                    borderRadius: '10px',
+                                    border: '2px solid var(--color-sage-green)',
+                                    background: 'white',
+                                    color: 'var(--color-sage-green)',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--color-soft-mint)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'white';
+                                }}
+                            >
+                                Stay Here
+                            </button>
+                            <button
+                                onClick={handleLogoutConfirm}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 24px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    background: 'var(--color-sage-green)',
+                                    color: 'white',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#6B8E50';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--color-sage-green)';
+                                }}
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div style={{
                 background: 'white',
                 borderRadius: '24px',
