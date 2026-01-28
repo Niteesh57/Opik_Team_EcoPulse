@@ -1,8 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Bot } from 'lucide-react';
+import { User, Bot, Loader2, CheckCircle2, Circle } from 'lucide-react';
 
-const ChatArea = ({ messages, loading, streamingMessage }) => {
+const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage }) => {
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -11,7 +11,7 @@ const ChatArea = ({ messages, loading, streamingMessage }) => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, streamingMessage]);
+    }, [messages, streamingMessage, toolSteps]);
 
     return (
         <div style={{
@@ -96,6 +96,68 @@ const ChatArea = ({ messages, loading, streamingMessage }) => {
                         </div>
                     ))}
 
+                    {/* Tool Steps */}
+                    {toolSteps && toolSteps.length > 0 && (
+                        <div style={{
+                            marginLeft: '44px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                        }}>
+                            {toolSteps.map((step, idx) => (
+                                <div key={idx} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 12px',
+                                    background: 'rgba(135, 169, 107, 0.1)',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    color: 'var(--color-charcoal)'
+                                }}>
+                                    {step.loading ? (
+                                        <Loader2 size={14} className="spinning" color="var(--color-sage-green)" />
+                                    ) : (
+                                        <CheckCircle2 size={14} color="var(--color-sage-green)" />
+                                    )}
+                                    <span>{step.description}</span>
+                                    {step.preview && (
+                                        <span style={{
+                                            fontSize: '11px',
+                                            opacity: 0.6,
+                                            marginLeft: 'auto',
+                                            maxWidth: '200px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}>
+                                            {step.preview}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Status Message */}
+                    {statusMessage && (
+                        <div style={{
+                            marginLeft: '44px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: 'rgba(135, 169, 107, 0.15)',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            color: 'var(--color-sage-green)',
+                            fontWeight: '500'
+                        }}>
+                            <Circle size={8} className="pulsing" />
+                            <span>{statusMessage}</span>
+                        </div>
+                    )}
+
                     {/* Streaming Message */}
                     {streamingMessage && (
                         <div style={{
@@ -121,13 +183,15 @@ const ChatArea = ({ messages, loading, streamingMessage }) => {
                                 fontSize: '15px',
                                 lineHeight: '1.5'
                             }}>
-                                <ReactMarkdown>{streamingMessage}</ReactMarkdown>
+                                <div className="markdown-content">
+                                    <ReactMarkdown>{streamingMessage}</ReactMarkdown>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* Loading Indicator */}
-                    {loading && !streamingMessage && (
+                    {loading && !streamingMessage && !statusMessage && (
                         <div style={{ display: 'flex', gap: '4px', marginLeft: '44px' }}>
                             <div className="typing-dot" style={{ animationDelay: '0s' }} />
                             <div className="typing-dot" style={{ animationDelay: '0.2s' }} />
@@ -151,6 +215,23 @@ const ChatArea = ({ messages, loading, streamingMessage }) => {
                     0%, 100% { transform: scale(1); }
                     50% { transform: scale(1.4); }
                 }
+                
+                .spinning {
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                
+                .pulsing {
+                    animation: pulse 1.5s ease-in-out infinite;
+                }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.3; }
+                }
+                
                 /* Basic markdown styles */
                 .markdown-content p { margin: 0 0 8px 0; }
                 .markdown-content p:last-child { margin: 0; }

@@ -52,13 +52,21 @@ export const chatService = {
     },
 
     /**
-     * Stream a chat response
-     * @param {Object} payload - { prompt, session_id }
-     * @param {Function} onChunk - Callback for each text chunk (delta)
-     * @param {Function} onComplete - Callback when stream ends
-     * @param {Function} onError - Callback for errors
+     * Stream a chat response with enhanced events
+     * @param {Object} payload - { message, thread_id (optional) }
+     * @param {Object} callbacks - { onSession, onStatus, onToolStart, onToolEnd, onDelta, onComplete, onError }
      */
-    async streamChatMessage(payload, onChunk, onComplete, onError) {
+    async streamChatMessage(payload, callbacks = {}) {
+        const {
+            onSession = () => { },
+            onStatus = () => { },
+            onToolStart = () => { },
+            onToolEnd = () => { },
+            onDelta = () => { },
+            onComplete = () => { },
+            onError = () => { }
+        } = callbacks;
+
         try {
             // We use authenticatedFetch directly to handle the stream manually
             const response = await authenticatedFetch(`${CHAT_BASE_URL}/stream`, {
@@ -98,14 +106,52 @@ export const chatService = {
                                 throw new Error(data.error);
                             }
 
-                            if (data.delta) {
-                                onChunk(data.delta);
-                            }
+                            // Handle different event types
+                            switch (data.event) {
+                                case 'session':
+                                    onSession({
+                                        sessionId: data.session_id,
+                                        messageId: data.message_id,
+                                        threadId: data.thread_id,
+                                        createdSession: data.created_session
+                                    });
+                                    break;
 
-                            if (data.event === 'end') {
-                                // Stream finished
-                                if (onComplete) onComplete(data);
-                                return;
+                                case 'status':
+                                    onStatus({
+                                        status: data.status,
+                                        message: data.message
+                                    });
+                                    break;
+
+                                case 'tool_start':
+                                    onToolStart({
+                                        tool: data.tool,
+                                        description: data.description,
+                                        args: data.args
+                                    });
+                                    break;
+
+                                case 'tool_end':
+                                    onToolEnd({
+                                        tool: data.tool,
+                                        resultPreview: data.result_preview
+                                    });
+                                    break;
+
+                                case 'end':
+                                    onComplete({
+                                        sessionId: data.session_id,
+                                        messageId: data.message_id,
+                                        assistantMessageId: data.assistant_message_id
+                                    });
+                                    return;
+
+                                default:
+                                    // Handle delta (text chunks)
+                                    if (data.delta) {
+                                        onDelta(data.delta);
+                                    }
                             }
                         } catch (e) {
                             console.warn('Failed to parse SSE data:', line, e);
@@ -114,12 +160,12 @@ export const chatService = {
                 }
             }
 
-            // Should usually be handled by 'end' event, but just in case
-            if (onComplete) onComplete();
+            // Fallback completion
+            onComplete({});
 
         } catch (error) {
             console.error('Stream error:', error);
-            if (onError) onError(error);
+            onError(error);
         }
     }
 };
