@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Menu, Search, LogOut, Plus } from 'lucide-react';
+import { Bell, Menu, Search, LogOut, Plus, Users } from 'lucide-react';
 import LeaderboardItem from './LeaderboardItem';
 import BottomNavigation from './BottomNavigation';
 import ChatInput from './ChatInput';
@@ -10,6 +10,8 @@ import NeighborCard from './NeighborCard';
 import EventChatModal from './EventChatModal';
 import NotificationsPanel from './NotificationsPanel';
 import ProfileView from './ProfileView';
+import CreateEventModal from './CreateEventModal';
+import AddNeighborModal from './AddNeighborModal';
 
 import { chatService } from '../services/chatService';
 import { notificationsService } from '../services/notificationsService';
@@ -30,19 +32,23 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
+    // Modal States
+    const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
+    const [isAddNeighborOpen, setIsAddNeighborOpen] = useState(false);
+
     // Data State
     const [events, setEvents] = useState([]);
     const [neighbors, setNeighbors] = useState([]);
+    const [leaders, setLeaders] = useState([]);
     const [activeChatEvent, setActiveChatEvent] = useState(null);
     const [user, setUser] = useState({ full_name: userName });
+    const [neighborSearch, setNeighborSearch] = useState('');
 
     // Chat State
     const [currentSession, setCurrentSession] = useState(null);
     const [messages, setMessages] = useState([]);
     const [streamingContent, setStreamingContent] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-
-    const [leaders, setLeaders] = useState([]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -51,7 +57,6 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         const checkNotifications = async () => {
             try {
                 const data = await notificationsService.getNotifications(0, 5);
-                // API returns { results: [], messages: boolean }
                 const list = Array.isArray(data) ? data : (data.results || []);
                 setHasUnreadNotifications(list.some(n => !n.is_read));
             } catch (error) {
@@ -63,6 +68,14 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         const interval = setInterval(checkNotifications, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if (currentSession?.session_id) {
+            loadMessages(currentSession.session_id);
+        } else {
+            setMessages([]);
+        }
+    }, [currentSession]);
 
     const fetchDashboardData = async () => {
         try {
@@ -86,10 +99,25 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         }
     };
 
+    const handleSearchNeighbors = async (query) => {
+        setNeighborSearch(query);
+        if (!query.trim()) {
+            // Reset to all members
+            const data = await neighborsService.getRoomMembers();
+            setNeighbors(data || []);
+            return;
+        }
+        try {
+            const results = await neighborsService.searchMembers(query);
+            setNeighbors(results || []);
+        } catch (error) {
+            console.error('Search failed:', error);
+        }
+    };
+
     const handleJoinEvent = async (eventId) => {
         try {
             await eventsService.joinEvent(eventId);
-            // Optimistic update
             setEvents(events.map(e =>
                 e.event_id === eventId
                     ? { ...e, this_user_already_joined: true, registered_users_count: (e.registered_users_count || 0) + 1 }
@@ -103,7 +131,6 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     const handleLeaveEvent = async (eventId) => {
         try {
             await eventsService.leaveEvent(eventId);
-            // Optimistic update
             setEvents(events.map(e =>
                 e.event_id === eventId
                     ? { ...e, this_user_already_joined: false, registered_users_count: Math.max(0, (e.registered_users_count || 0) - 1) }
@@ -118,12 +145,17 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         try {
             await neighborsService.addNeighbor(userId);
             alert("Friend request sent!");
+            fetchDashboardData(); // Refresh
         } catch (error) {
             console.error('Failed to add neighbor:', error);
         }
     };
 
-    // Chat Logic
+    const handleEventCreated = (newEvent) => {
+        setEvents(prev => [newEvent, ...prev]);
+        setIsCreateEventOpen(false);
+    };
+
     const loadMessages = async (sessionId) => {
         try {
             const history = await chatService.getMessages(sessionId);
@@ -137,11 +169,13 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         setViewMode('chat');
         setIsThinking(true);
         setStreamingContent('');
+
         const optimisticMsg = { role: 'user', user_message: text, id: Date.now() };
         setMessages(prev => [...prev, optimisticMsg]);
 
         try {
             let sessionId = currentSession?.session_id;
+
             await chatService.streamChatMessage(
                 { prompt: text, session_id: sessionId || null },
                 (chunk) => setStreamingContent(prev => prev + chunk),
@@ -162,7 +196,10 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                 (err) => {
                     console.error('Streaming error', err);
                     setIsThinking(false);
-                    setMessages(prev => [...prev, { role: 'assistant', ai_message: "I'm having trouble connecting right now. Please try again." }]);
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        ai_message: "I'm having trouble connecting right now. Please try again."
+                    }]);
                 }
             );
         } catch (error) {
@@ -180,10 +217,8 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
 
     const handleSelectSession = (session) => {
         setCurrentSession(session);
-        setMessages([]); // Clear distinct messages before loading new ones
         setViewMode('chat');
         setIsSidebarOpen(false);
-        if (session?.session_id) loadMessages(session.session_id);
     };
 
     return (
@@ -208,6 +243,20 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                 eventId={activeChatEvent?.event_id}
                 eventName={activeChatEvent?.event_name}
                 currentUser={user}
+            />
+
+            {/* Create Event Modal */}
+            <CreateEventModal
+                isOpen={isCreateEventOpen}
+                onClose={() => setIsCreateEventOpen(false)}
+                onEventCreated={handleEventCreated}
+            />
+
+            {/* Add Neighbor Modal */}
+            <AddNeighborModal
+                isOpen={isAddNeighborOpen}
+                onClose={() => setIsAddNeighborOpen(false)}
+                onNeighborAdded={() => fetchDashboardData()}
             />
 
             {/* Header */}
@@ -258,8 +307,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                         <button onClick={onLogout} style={{
                             width: '40px', height: '40px', borderRadius: '50%',
                             background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: 'none', cursor: 'pointer',
-                            transition: 'all 0.2s ease'
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.05)', border: 'none', cursor: 'pointer'
                         }} title="Logout">
                             <LogOut size={20} color="var(--color-charcoal)" />
                         </button>
@@ -275,13 +323,13 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                     <section style={{ marginBottom: '32px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <h2>Community Events</h2>
-                            <div style={{
+                            <button onClick={() => setIsCreateEventOpen(true)} style={{
                                 width: '32px', height: '32px', borderRadius: '10px',
                                 background: 'var(--color-sage-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(135, 169, 107, 0.3)'
+                                boxShadow: '0 4px 12px rgba(135, 169, 107, 0.3)', border: 'none', cursor: 'pointer'
                             }}>
                                 <Plus size={18} color="white" />
-                            </div>
+                            </button>
                         </div>
 
                         <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', padding: '4px 4px 24px 4px' }}>
@@ -292,7 +340,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                                     isJoined={event.this_user_already_joined}
                                     onJoin={handleJoinEvent}
                                     onLeave={handleLeaveEvent}
-                                    onChat={(id) => setActiveChatEvent(event)}
+                                    onChat={() => setActiveChatEvent(event)}
                                 />
                             )) : (
                                 <div style={{ padding: '20px', color: 'var(--color-text-secondary)' }}>No upcoming events.</div>
@@ -304,7 +352,32 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                     <section style={{ marginBottom: '32px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <h2>Neighbors</h2>
-                            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-sage-green)' }}>View All</span>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    background: 'white', borderRadius: '20px', padding: '6px 12px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                                }}>
+                                    <Search size={14} color="var(--color-sage-green)" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={neighborSearch}
+                                        onChange={(e) => handleSearchNeighbors(e.target.value)}
+                                        style={{
+                                            border: 'none', outline: 'none', fontSize: '12px', width: '80px',
+                                            background: 'transparent'
+                                        }}
+                                    />
+                                </div>
+                                <button onClick={() => setIsAddNeighborOpen(true)} style={{
+                                    width: '28px', height: '28px', borderRadius: '8px',
+                                    background: 'var(--color-sage-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    border: 'none', cursor: 'pointer'
+                                }}>
+                                    <Users size={14} color="white" />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="no-scrollbar" style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -313,7 +386,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                                     <NeighborCard
                                         neighbor={neighbor}
                                         onAdd={handleAddNeighbor}
-                                        isAdded={false} // Would check if already friend in a real app
+                                        isAdded={neighbor.is_already_added}
                                     />
                                 </div>
                             )) : (
@@ -336,9 +409,13 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                {leaders.map((leader) => (
+                                {leaders.length > 0 ? leaders.map((leader) => (
                                     <LeaderboardItem key={leader.rank} {...leader} maxPoints={1500} />
-                                ))}
+                                )) : (
+                                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                                        No champions yet. Be the first!
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </section>
