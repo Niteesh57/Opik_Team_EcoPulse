@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { eventsService } from '../services/eventsService';
 import { authService } from '../services/auth';
+import { usersService } from '../services/usersService';
 
 const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) => {
     const [messages, setMessages] = useState([]);
@@ -13,51 +16,243 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
 
-    // Get current user ID on mount - use multiple methods
+    // Get current user ID on mount - fetch from /users/me API
     useEffect(() => {
-        // Try from prop first
-        if (currentUser?.id || currentUser?.user_id) {
-            setMyUserId(currentUser?.id || currentUser?.user_id);
-            return;
-        }
+        const fetchCurrentUser = async () => {
+            // First check localStorage for cached user ID
+            try {
+                const storedUserId = localStorage.getItem('currentUserId');
+                if (storedUserId) {
+                    setMyUserId(parseInt(storedUserId, 10));
+                }
+            } catch (e) {
+                // Ignore localStorage errors
+            }
 
-        // Try from localStorage
-        try {
-            const storedUser = localStorage.getItem('user');
-            if (storedUser) {
-                const parsed = JSON.parse(storedUser);
-                if (parsed?.id || parsed?.user_id) {
-                    setMyUserId(parsed?.id || parsed?.user_id);
-                    return;
+            // Always fetch from API to ensure we have the latest user ID
+            try {
+                const userData = await usersService.getMe();
+                if (userData && userData.id) {
+                    const userId = userData.id;
+                    setMyUserId(userId);
+                    // Save to localStorage for quick access
+                    localStorage.setItem('currentUserId', String(userId));
+                    // Also save full user data
+                    localStorage.setItem('user', JSON.stringify(userData));
+                    console.log('Current user ID fetched:', userId);
+                }
+            } catch (error) {
+                console.error('Failed to fetch current user:', error);
+                // Fallback to prop or localStorage
+                if (currentUser?.id || currentUser?.user_id) {
+                    setMyUserId(currentUser?.id || currentUser?.user_id);
+                } else {
+                    try {
+                        const storedUser = localStorage.getItem('user');
+                        if (storedUser) {
+                            const parsed = JSON.parse(storedUser);
+                            if (parsed?.id || parsed?.user_id) {
+                                setMyUserId(parsed?.id || parsed?.user_id);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse stored user:', e);
+                    }
                 }
             }
-        } catch (e) {
-            console.error('Failed to parse stored user:', e);
+        };
+
+        if (isOpen) {
+            fetchCurrentUser();
         }
     }, [currentUser, isOpen]);
 
-    // Helper to render message with @mention highlighting
-    const renderMessageWithMentions = (text, isMe) => {
-        if (!text) return text;
+    // Helper to detect YouTube URL and extract video ID
+    const getYouTubeVideoId = (url) => {
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/
+        ];
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) return match[1];
+        }
+        return null;
+    };
 
-        const parts = text.split(/(@\w+)/g);
+    // Helper to detect if URL is an image
+    const isImageUrl = (url) => {
+        return /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
+            url.includes('i.ibb.co') ||
+            url.includes('imgur.com') ||
+            url.includes('cloudinary.com');
+    };
 
-        return parts.map((part, i) => {
-            if (part.startsWith('@')) {
+    // Markdown components with custom styling
+    const getMarkdownComponents = (isMe) => ({
+        // Tables
+        table: ({ children }) => (
+            <div style={{
+                overflowX: 'auto',
+                marginTop: '8px',
+                marginBottom: '8px',
+                borderRadius: '8px',
+                border: `1px solid ${isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`
+            }}>
+                <table style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '12px',
+                    minWidth: '300px'
+                }}>
+                    {children}
+                </table>
+            </div>
+        ),
+        thead: ({ children }) => (
+            <thead style={{
+                background: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(135, 169, 107, 0.15)'
+            }}>
+                {children}
+            </thead>
+        ),
+        th: ({ children }) => (
+            <th style={{
+                padding: '8px 10px',
+                textAlign: 'left',
+                borderBottom: `1px solid ${isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                fontWeight: '600',
+                fontSize: '11px',
+                whiteSpace: 'nowrap'
+            }}>
+                {children}
+            </th>
+        ),
+        td: ({ children }) => (
+            <td style={{
+                padding: '6px 10px',
+                borderBottom: `1px solid ${isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`,
+                fontSize: '12px',
+                lineHeight: '1.4'
+            }}>
+                {children}
+            </td>
+        ),
+        // Links - check for YouTube and images
+        a: ({ href, children }) => {
+            const ytId = getYouTubeVideoId(href);
+            if (ytId) {
                 return (
-                    <span key={i} style={{
-                        background: isMe ? 'rgba(255,255,255,0.3)' : 'rgba(135, 169, 107, 0.2)',
-                        color: isMe ? 'white' : 'var(--color-sage-green)',
-                        fontWeight: '600',
-                        padding: '1px 4px',
-                        borderRadius: '4px'
+                    <div style={{
+                        marginTop: '8px',
+                        marginBottom: '8px',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        minWidth: '280px'
                     }}>
-                        {part}
-                    </span>
+                        <iframe
+                            width="100%"
+                            height="180"
+                            src={`https://www.youtube.com/embed/${ytId}`}
+                            title="YouTube video"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            style={{ borderRadius: '12px' }}
+                        />
+                    </div>
                 );
             }
-            return part;
+            return (
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                        color: isMe ? '#a8e6cf' : 'var(--color-sage-green)',
+                        textDecoration: 'underline'
+                    }}
+                >
+                    {children}
+                </a>
+            );
+        },
+        // Images
+        img: ({ src, alt }) => (
+            <div style={{ marginTop: '8px', marginBottom: '8px', minWidth: '200px' }}>
+                <img
+                    src={src}
+                    alt={alt || 'Shared image'}
+                    style={{
+                        maxWidth: '100%',
+                        minWidth: '200px',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => window.open(src, '_blank')}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                />
+            </div>
+        ),
+        // Code blocks
+        code: ({ inline, children }) => (
+            <code style={{
+                background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)',
+                padding: inline ? '2px 6px' : '8px 12px',
+                borderRadius: inline ? '4px' : '8px',
+                fontSize: '12px',
+                display: inline ? 'inline' : 'block',
+                overflowX: 'auto',
+                whiteSpace: inline ? 'nowrap' : 'pre-wrap'
+            }}>
+                {children}
+            </code>
+        ),
+        // Strong/bold with @mention detection
+        strong: ({ children }) => (
+            <strong style={{ fontWeight: '600' }}>{children}</strong>
+        ),
+        // Paragraphs
+        p: ({ children }) => (
+            <p style={{ margin: '4px 0', lineHeight: '1.5' }}>{children}</p>
+        ),
+        // Lists
+        ul: ({ children }) => (
+            <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>{children}</ul>
+        ),
+        ol: ({ children }) => (
+            <ol style={{ margin: '4px 0', paddingLeft: '20px' }}>{children}</ol>
+        ),
+        li: ({ children }) => (
+            <li style={{ marginBottom: '2px' }}>{children}</li>
+        )
+    });
+
+    // Process @mentions in text before rendering
+    const processAtMentions = (text, isMe) => {
+        if (!text) return text;
+        return text.replace(/@(\w+)/g, (match) => {
+            // Wrap in a special marker that we'll style
+            return `**${match}**`;
         });
+    };
+
+    // Render message with full markdown support
+    const renderMessageContent = (text, isMe) => {
+        if (!text) return text;
+
+        // Pre-process @mentions to make them bold
+        const processedText = processAtMentions(text, isMe);
+
+        return (
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={getMarkdownComponents(isMe)}
+            >
+                {processedText}
+            </ReactMarkdown>
+        );
     };
 
     // Fetch initial history
@@ -167,8 +362,8 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
             <div style={{
                 position: 'relative',
                 width: '100%',
-                maxWidth: '500px',
-                height: '80vh',
+                maxWidth: '600px',
+                height: '90vh',
                 background: 'rgba(255, 255, 255, 0.95)',
                 backdropFilter: 'blur(20px)',
                 borderRadius: '24px',
@@ -279,7 +474,7 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                                         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                                         wordBreak: 'break-word'
                                     }}>
-                                        {renderMessageWithMentions(msg.message, isMe)}
+                                        {renderMessageContent(msg.message, isMe)}
                                     </div>
                                     <span style={{
                                         fontSize: '10px',
@@ -309,22 +504,66 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                         alignItems: 'center'
                     }}
                 >
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
-                        disabled={!isConnected}
-                        style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: '24px',
-                            border: '1px solid rgba(0,0,0,0.1)',
-                            background: '#F8F9FA',
-                            outline: 'none',
-                            fontSize: '14px'
-                        }}
-                    />
+                    <div style={{ flex: 1, position: 'relative' }}>
+                        {/* Highlight overlay - shows only backgrounds, all text is transparent */}
+                        <div
+                            aria-hidden="true"
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                padding: '12px 16px',
+                                borderRadius: '24px',
+                                background: '#F8F9FA',
+                                border: '1px solid transparent',
+                                fontSize: '14px',
+                                whiteSpace: 'pre',
+                                overflow: 'hidden',
+                                pointerEvents: 'none',
+                                fontFamily: 'inherit',
+                                lineHeight: 'normal'
+                            }}
+                        >
+                            {newMessage.split(/(@\w+)/g).map((part, i) => {
+                                if (part.startsWith('@')) {
+                                    return (
+                                        <span key={i} style={{
+                                            background: 'rgba(135, 169, 107, 0.3)',
+                                            padding: '2px 1px',
+                                            borderRadius: '4px',
+                                            color: 'transparent'
+                                        }}>
+                                            {part}
+                                        </span>
+                                    );
+                                }
+                                return <span key={i} style={{ color: 'transparent' }}>{part}</span>;
+                            })}
+                        </div>
+                        {/* Actual input */}
+                        <input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Type a message... (use @AI to mention)"
+                            disabled={!isConnected}
+                            style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                borderRadius: '24px',
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                background: 'transparent',
+                                outline: 'none',
+                                fontSize: '14px',
+                                position: 'relative',
+                                zIndex: 1,
+                                fontFamily: 'inherit',
+                                caretColor: 'var(--color-charcoal)'
+                            }}
+                        />
+                    </div>
                     <button
                         type="submit"
                         disabled={!isConnected || !newMessage.trim()}

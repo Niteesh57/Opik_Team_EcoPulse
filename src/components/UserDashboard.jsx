@@ -12,6 +12,7 @@ import NotificationsPanel from './NotificationsPanel';
 import ProfileView from './ProfileView';
 import CreateEventModal from './CreateEventModal';
 import AddNeighborModal from './AddNeighborModal';
+import DashboardSkeleton from './DashboardSkeleton';
 
 import { chatService } from '../services/chatService';
 import { notificationsService } from '../services/notificationsService';
@@ -58,6 +59,23 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         completedTools: []   // Array of completed tool names
     });
 
+    // Language preference - synced with localStorage and Profile changes
+    const [preferredLanguage, setPreferredLanguage] = useState(() => {
+        return localStorage.getItem('preferredLanguage') || 'en';
+    });
+
+    // Listen for language changes from ProfileView
+    useEffect(() => {
+        const handleLanguageChange = (event) => {
+            setPreferredLanguage(event.detail);
+        };
+        window.addEventListener('languageChange', handleLanguageChange);
+        return () => window.removeEventListener('languageChange', handleLanguageChange);
+    }, []);
+
+    // Dashboard Loading State
+    const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+
     useEffect(() => {
         fetchDashboardData();
 
@@ -86,6 +104,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     }, [currentSession]);
 
     const fetchDashboardData = async () => {
+        setIsDashboardLoading(true);
         try {
             const [eventsData, neighborsData, championsData] = await Promise.all([
                 eventsService.getEvents(),
@@ -97,13 +116,15 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
             // Map champions to leaderboard format
             const leaderList = (championsData || []).map((c, i) => ({
                 rank: i + 1,
-                name: c.full_name || c.username,
-                points: c.points || 0,
-                avatar: PLACEHOLDERS[`avatar${(i % 3) + 1}`]
+                name: c.full_name || c.username || 'User',
+                points: c.points || 0
+                // No avatar - LeaderboardItem will show initials based on name
             }));
             setLeaders(leaderList);
         } catch (error) {
             console.error('Failed to fetch dashboard data:', error);
+        } finally {
+            setIsDashboardLoading(false);
         }
     };
 
@@ -193,7 +214,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
             let threadId = currentSession?.session_id;
 
             await chatService.streamChatMessage(
-                { message: text, thread_id: threadId || null },
+                { message: text, thread_id: threadId || null, language: preferredLanguage },
                 {
                     onSession: (data) => {
                         if (data.sessionId && !threadId) {
@@ -393,107 +414,112 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
             {/* Dashboard Content */}
             {viewMode === 'dashboard' ? (
                 <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
-
-                    {/* Community Events */}
-                    <section style={{ marginBottom: '32px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h2>Community Events</h2>
-                            <button onClick={() => setIsCreateEventOpen(true)} style={{
-                                width: '32px', height: '32px', borderRadius: '10px',
-                                background: 'var(--color-sage-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(135, 169, 107, 0.3)', border: 'none', cursor: 'pointer'
-                            }}>
-                                <Plus size={18} color="white" />
-                            </button>
-                        </div>
-
-                        <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', padding: '4px 4px 24px 4px' }}>
-                            {events && events.length > 0 ? events.map((event) => (
-                                <EventCard
-                                    key={event.event_id}
-                                    event={event}
-                                    isJoined={event.this_user_already_joined}
-                                    onJoin={handleJoinEvent}
-                                    onLeave={handleLeaveEvent}
-                                    onChat={() => setActiveChatEvent(event)}
-                                />
-                            )) : (
-                                <div style={{ padding: '20px', color: 'var(--color-text-secondary)' }}>No upcoming events.</div>
-                            )}
-                        </div>
-                    </section>
-
-                    {/* Neighbors */}
-                    <section style={{ marginBottom: '32px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h2>Neighbors</h2>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <div style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    background: 'white', borderRadius: '20px', padding: '6px 12px',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                                }}>
-                                    <Search size={14} color="var(--color-sage-green)" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search..."
-                                        value={neighborSearch}
-                                        onChange={(e) => handleSearchNeighbors(e.target.value)}
-                                        style={{
-                                            border: 'none', outline: 'none', fontSize: '12px', width: '80px',
-                                            background: 'transparent'
-                                        }}
-                                    />
+                    {isDashboardLoading ? (
+                        <DashboardSkeleton />
+                    ) : (
+                        <>
+                            {/* Community Events */}
+                            <section style={{ marginBottom: '32px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                    <h2>Community Events</h2>
+                                    <button onClick={() => setIsCreateEventOpen(true)} style={{
+                                        width: '32px', height: '32px', borderRadius: '10px',
+                                        background: 'var(--color-sage-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: '0 4px 12px rgba(135, 169, 107, 0.3)', border: 'none', cursor: 'pointer'
+                                    }}>
+                                        <Plus size={18} color="white" />
+                                    </button>
                                 </div>
-                                <button onClick={() => setIsAddNeighborOpen(true)} style={{
-                                    width: '28px', height: '28px', borderRadius: '8px',
-                                    background: 'var(--color-sage-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    border: 'none', cursor: 'pointer'
-                                }}>
-                                    <Users size={14} color="white" />
-                                </button>
-                            </div>
-                        </div>
 
-                        <div className="no-scrollbar" style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-                            {neighbors && neighbors.length > 0 ? neighbors.map((neighbor) => (
-                                <div key={neighbor.id} style={{ minWidth: '200px' }}>
-                                    <NeighborCard
-                                        neighbor={neighbor}
-                                        onAdd={handleAddNeighbor}
-                                        isAdded={neighbor.is_already_added}
-                                    />
+                                <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', padding: '4px 4px 24px 4px' }}>
+                                    {events && events.length > 0 ? events.map((event) => (
+                                        <EventCard
+                                            key={event.event_id}
+                                            event={event}
+                                            isJoined={event.this_user_already_joined}
+                                            onJoin={handleJoinEvent}
+                                            onLeave={handleLeaveEvent}
+                                            onChat={() => setActiveChatEvent(event)}
+                                        />
+                                    )) : (
+                                        <div style={{ padding: '20px', color: 'var(--color-text-secondary)' }}>No upcoming events.</div>
+                                    )}
                                 </div>
-                            )) : (
-                                <div style={{ padding: '20px', color: 'var(--color-text-secondary)' }}>No neighbors found.</div>
-                            )}
-                        </div>
-                    </section>
+                            </section>
 
-                    {/* Champions */}
-                    <section style={{ marginBottom: '24px' }}>
-                        <div style={{
-                            background: 'white', borderRadius: '24px', padding: '24px',
-                            boxShadow: '0 4px 24px rgba(0,0,0,0.03)'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                <h2 style={{ marginBottom: 0 }}>Community Champions</h2>
-                                <div style={{ background: 'var(--color-soft-mint)', padding: '8px', borderRadius: '12px' }}>
-                                    <Search size={16} color="var(--color-sage-green)" />
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                {leaders.length > 0 ? leaders.map((leader) => (
-                                    <LeaderboardItem key={leader.rank} {...leader} maxPoints={1500} />
-                                )) : (
-                                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                                        No champions yet. Be the first!
+                            {/* Neighbors */}
+                            <section style={{ marginBottom: '32px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                    <h2>Neighbors</h2>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            background: 'white', borderRadius: '20px', padding: '6px 12px',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                                        }}>
+                                            <Search size={14} color="var(--color-sage-green)" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search..."
+                                                value={neighborSearch}
+                                                onChange={(e) => handleSearchNeighbors(e.target.value)}
+                                                style={{
+                                                    border: 'none', outline: 'none', fontSize: '12px', width: '80px',
+                                                    background: 'transparent'
+                                                }}
+                                            />
+                                        </div>
+                                        <button onClick={() => setIsAddNeighborOpen(true)} style={{
+                                            width: '28px', height: '28px', borderRadius: '8px',
+                                            background: 'var(--color-sage-green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            border: 'none', cursor: 'pointer'
+                                        }}>
+                                            <Users size={14} color="white" />
+                                        </button>
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    </section>
+                                </div>
+
+                                <div className="no-scrollbar" style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+                                    {neighbors && neighbors.length > 0 ? neighbors.map((neighbor) => (
+                                        <div key={neighbor.id} style={{ minWidth: '200px' }}>
+                                            <NeighborCard
+                                                neighbor={neighbor}
+                                                onAdd={handleAddNeighbor}
+                                                isAdded={neighbor.is_already_added}
+                                            />
+                                        </div>
+                                    )) : (
+                                        <div style={{ padding: '20px', color: 'var(--color-text-secondary)' }}>No neighbors found.</div>
+                                    )}
+                                </div>
+                            </section>
+
+                            {/* Champions */}
+                            <section style={{ marginBottom: '24px' }}>
+                                <div style={{
+                                    background: 'white', borderRadius: '24px', padding: '24px',
+                                    boxShadow: '0 4px 24px rgba(0,0,0,0.03)'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                        <h2 style={{ marginBottom: 0 }}>Community Champions</h2>
+                                        <div style={{ background: 'var(--color-soft-mint)', padding: '8px', borderRadius: '12px' }}>
+                                            <Search size={16} color="var(--color-sage-green)" />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        {leaders.length > 0 ? leaders.map((leader) => (
+                                            <LeaderboardItem key={leader.rank} {...leader} maxPoints={1500} />
+                                        )) : (
+                                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+                                                No champions yet. Be the first!
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
+                        </>
+                    )}
                 </div>
             ) : viewMode === 'profile' ? (
                 <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>

@@ -4,25 +4,27 @@ import { usersService } from '../services/usersService';
 
 const LANGUAGES = [
     { code: 'en', name: 'English' },
-    { code: 'es', name: 'Spanish' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'zh', name: 'Chinese (Mandarin)' },
+    { code: 'nl', name: 'Dutch' },
     { code: 'fr', name: 'French' },
     { code: 'de', name: 'German' },
-    { code: 'zh', name: 'Chinese (Mandarin)' },
+    { code: 'el', name: 'Greek' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'id', name: 'Indonesian' },
+    { code: 'it', name: 'Italian' },
     { code: 'ja', name: 'Japanese' },
     { code: 'ko', name: 'Korean' },
-    { code: 'hi', name: 'Hindi' },
-    { code: 'ar', name: 'Arabic' },
+    { code: 'pl', name: 'Polish' },
     { code: 'pt', name: 'Portuguese' },
     { code: 'ru', name: 'Russian' },
-    { code: 'it', name: 'Italian' },
-    { code: 'nl', name: 'Dutch' },
-    { code: 'tr', name: 'Turkish' },
-    { code: 'pl', name: 'Polish' },
+    { code: 'es', name: 'Spanish' },
     { code: 'sv', name: 'Swedish' },
-    { code: 'id', name: 'Indonesian' },
-    { code: 'vi', name: 'Vietnamese' },
+    { code: 'ta', name: 'Tamil' },
+    { code: 'te', name: 'Telugu' },
     { code: 'th', name: 'Thai' },
-    { code: 'el', name: 'Greek' }
+    { code: 'tr', name: 'Turkish' },
+    { code: 'vi', name: 'Vietnamese' }
 ];
 
 const ProfileView = ({ user: initialUser }) => {
@@ -34,11 +36,42 @@ const ProfileView = ({ user: initialUser }) => {
 
     const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(true);
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
 
+    // Fetch user data from API on mount
     useEffect(() => {
-        if (initialUser) {
+        const fetchUserData = async () => {
+            setIsFetching(true);
+            try {
+                const userData = await usersService.getMe();
+                if (userData) {
+                    setUser(userData);
+                    setFullName(userData.full_name || '');
+                    setUsername(userData.username || '');
+                    setEmail(userData.email || '');
+                }
+            } catch (error) {
+                console.error('Failed to fetch user data:', error);
+                // Fallback to initialUser if API fails
+                if (initialUser) {
+                    setUser(initialUser);
+                    setFullName(initialUser.full_name || '');
+                    setUsername(initialUser.username || '');
+                    setEmail(initialUser.email || '');
+                }
+            } finally {
+                setIsFetching(false);
+            }
+        };
+
+        fetchUserData();
+    }, []);
+
+    // Also update from initialUser if it changes (legacy support)
+    useEffect(() => {
+        if (initialUser && !isFetching) {
             setUser(initialUser);
             setFullName(initialUser.full_name || '');
             setUsername(initialUser.username || '');
@@ -71,11 +104,37 @@ const ProfileView = ({ user: initialUser }) => {
         }
     };
 
-    const handleLanguageSelect = (langCode) => {
+    // Load language from user data (API) or localStorage on mount
+    useEffect(() => {
+        // If user has lang from API, use that
+        if (user?.lang) {
+            setSelectedLanguage(user.lang);
+            localStorage.setItem('preferredLanguage', user.lang);
+        } else {
+            // Fallback to localStorage
+            const savedLang = localStorage.getItem('preferredLanguage');
+            if (savedLang) {
+                setSelectedLanguage(savedLang);
+            }
+        }
+    }, [user?.lang]);
+
+    const handleLanguageSelect = async (langCode) => {
         setSelectedLanguage(langCode);
         setIsLangDropdownOpen(false);
-        // Here you would typically trigger an app-level language change
-        // For now we just update the local state
+
+        // Save to localStorage for immediate UI updates
+        localStorage.setItem('preferredLanguage', langCode);
+        // Dispatch custom event for app-wide language change
+        window.dispatchEvent(new CustomEvent('languageChange', { detail: langCode }));
+
+        // Save to server using PUT /api/v1/users/me
+        try {
+            await usersService.updateMe({ lang: langCode });
+            console.log('Language preference saved to server:', langCode);
+        } catch (error) {
+            console.error('Failed to save language preference:', error);
+        }
     };
 
     return (

@@ -1,6 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { User, Bot, Loader2, CheckCircle2, Circle, MessageSquare } from 'lucide-react';
+import AIProcessingIndicator from './AIProcessingIndicator';
 
 const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage, waitingForUser }) => {
     const messagesEndRef = useRef(null);
@@ -101,7 +103,91 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                     <p style={{ margin: 0, color: 'inherit' }}>{msg.user_message || msg.content}</p>
                                 ) : (
                                     <div className="markdown-content">
-                                        <ReactMarkdown>
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                // Tables
+                                                table: ({ children }) => (
+                                                    <div style={{
+                                                        overflowX: 'auto',
+                                                        marginTop: '8px',
+                                                        marginBottom: '8px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid rgba(0,0,0,0.1)'
+                                                    }}>
+                                                        <table style={{
+                                                            width: '100%',
+                                                            borderCollapse: 'collapse',
+                                                            fontSize: '13px',
+                                                            minWidth: '300px'
+                                                        }}>
+                                                            {children}
+                                                        </table>
+                                                    </div>
+                                                ),
+                                                thead: ({ children }) => (
+                                                    <thead style={{ background: 'rgba(135, 169, 107, 0.15)' }}>
+                                                        {children}
+                                                    </thead>
+                                                ),
+                                                th: ({ children }) => (
+                                                    <th style={{
+                                                        padding: '8px 10px',
+                                                        textAlign: 'left',
+                                                        borderBottom: '1px solid rgba(0,0,0,0.1)',
+                                                        fontWeight: '600',
+                                                        fontSize: '12px',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {children}
+                                                    </th>
+                                                ),
+                                                td: ({ children }) => (
+                                                    <td style={{
+                                                        padding: '6px 10px',
+                                                        borderBottom: '1px solid rgba(0,0,0,0.05)',
+                                                        fontSize: '12px',
+                                                        lineHeight: '1.4'
+                                                    }}>
+                                                        {children}
+                                                    </td>
+                                                ),
+                                                // Code blocks
+                                                code: ({ inline, children }) => (
+                                                    <code style={{
+                                                        background: 'rgba(0,0,0,0.06)',
+                                                        padding: inline ? '2px 6px' : '8px 12px',
+                                                        borderRadius: inline ? '4px' : '8px',
+                                                        fontSize: '13px',
+                                                        display: inline ? 'inline' : 'block',
+                                                        overflowX: 'auto'
+                                                    }}>
+                                                        {children}
+                                                    </code>
+                                                ),
+                                                // Images
+                                                img: ({ src, alt }) => (
+                                                    <img
+                                                        src={src}
+                                                        alt={alt || 'Image'}
+                                                        style={{
+                                                            maxWidth: '100%',
+                                                            minWidth: '200px',
+                                                            borderRadius: '12px',
+                                                            marginTop: '8px',
+                                                            marginBottom: '8px',
+                                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        onClick={() => window.open(src, '_blank')}
+                                                    />
+                                                ),
+                                                // Paragraphs
+                                                p: ({ children }) => (
+                                                    <p style={{ margin: '4px 0' }}>{children}</p>
+                                                )
+                                            }}
+                                        >
                                             {msg.ai_message || msg.content || ''}
                                         </ReactMarkdown>
                                     </div>
@@ -110,66 +196,14 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                         </div>
                     ))}
 
-                    {/* Tool Steps */}
-                    {toolSteps && toolSteps.length > 0 && (
-                        <div style={{
-                            marginLeft: '44px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px'
-                        }}>
-                            {toolSteps.map((step, idx) => (
-                                <div key={idx} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '8px 12px',
-                                    background: 'rgba(135, 169, 107, 0.1)',
-                                    borderRadius: '8px',
-                                    fontSize: '13px',
-                                    color: 'var(--color-charcoal)'
-                                }}>
-                                    {step.loading ? (
-                                        <Loader2 size={14} className="spinning" color="var(--color-sage-green)" />
-                                    ) : (
-                                        <CheckCircle2 size={14} color="var(--color-sage-green)" />
-                                    )}
-                                    <span>{step.description}</span>
-                                    {step.preview && (
-                                        <span style={{
-                                            fontSize: '11px',
-                                            opacity: 0.6,
-                                            marginLeft: 'auto',
-                                            maxWidth: '200px',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap'
-                                        }}>
-                                            {step.preview}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Status Message */}
-                    {statusMessage && (
-                        <div style={{
-                            marginLeft: '44px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            background: 'rgba(135, 169, 107, 0.15)',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            color: 'var(--color-sage-green)',
-                            fontWeight: '500'
-                        }}>
-                            <Circle size={8} className="pulsing" />
-                            <span>{statusMessage}</span>
-                        </div>
+                    {/* AI Processing Indicator - Glassy Animated Design */}
+                    {(loading || (toolSteps && toolSteps.length > 0) || statusMessage) && (
+                        <AIProcessingIndicator
+                            isProcessing={loading}
+                            statusMessage={statusMessage}
+                            activeTool={toolSteps?.find(s => s.loading)}
+                            completedTools={toolSteps?.filter(s => !s.loading).map(s => s.description) || []}
+                        />
                     )}
 
                     {/* Streaming Message */}
