@@ -29,7 +29,7 @@ export const notificationsService = {
      * Mark a single notification as read
      */
     async markAsRead(id) {
-        return this.updateNotification(id, { read: true });
+        return this.updateNotification(id, { is_read: true });
     },
 
     /**

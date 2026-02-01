@@ -32,7 +32,7 @@ const NotificationsPanel = ({ isOpen, onClose, onNotificationRead }) => {
     const handleMarkAllRead = async () => {
         try {
             await notificationsService.markAllAsRead();
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
             if (onNotificationRead) onNotificationRead();
         } catch (error) {
             console.error('Failed to mark all read:', error);
@@ -135,7 +135,7 @@ const NotificationsPanel = ({ isOpen, onClose, onNotificationRead }) => {
                             <div key={notification.id} style={{
                                 padding: '16px 20px',
                                 borderBottom: '1px solid rgba(0,0,0,0.03)',
-                                background: notification.read ? 'transparent' : 'rgba(135, 169, 107, 0.05)',
+                                background: notification.is_read ? 'transparent' : 'rgba(135, 169, 107, 0.05)',
                                 transition: 'background 0.2s'
                             }}>
                                 <div style={{ display: 'flex', gap: '12px' }}>
@@ -207,7 +207,7 @@ const NotificationsPanel = ({ isOpen, onClose, onNotificationRead }) => {
                                     </div>
 
                                     {/* Unread dot */}
-                                    {!notification.read && (
+                                    {!notification.is_read && (
                                         <div style={{
                                             width: '8px', height: '8px',
                                             borderRadius: '50%',

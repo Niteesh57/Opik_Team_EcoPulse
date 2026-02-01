@@ -12,6 +12,36 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
 
+    // Helper to get current user ID (handles both id and user_id)
+    const getCurrentUserId = () => {
+        return currentUser?.id || currentUser?.user_id;
+    };
+
+    // Helper to render message with @mention highlighting
+    const renderMessageWithMentions = (text, isMe) => {
+        if (!text) return text;
+
+        // Split by @mentions and highlight them
+        const parts = text.split(/(@\w+)/g);
+
+        return parts.map((part, i) => {
+            if (part.startsWith('@')) {
+                return (
+                    <span key={i} style={{
+                        background: isMe ? 'rgba(255,255,255,0.3)' : 'rgba(135, 169, 107, 0.2)',
+                        color: isMe ? 'white' : 'var(--color-sage-green)',
+                        fontWeight: '600',
+                        padding: '1px 4px',
+                        borderRadius: '4px'
+                    }}>
+                        {part}
+                    </span>
+                );
+            }
+            return part;
+        });
+    };
+
     // Fetch initial history
     useEffect(() => {
         if (!isOpen || !eventId) return;
@@ -214,9 +244,9 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                     ) : (
                         messages.map((msg, index) => {
                             // Check if current user is sender
-                            // currentUser object might have id, sometimes user_id. 
-                            // Adjust check based on your app's user object structure.
-                            const isMe = msg.user_id === currentUser?.id;
+                            // Handle both id and user_id in currentUser object
+                            const myId = getCurrentUserId();
+                            const isMe = msg.user_id === myId || msg.username === currentUser?.username;
 
                             return (
                                 <div key={msg.id || index} style={{
@@ -247,46 +277,7 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                                         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                                         wordBreak: 'break-word'
                                     }}>
-                                        {msg.message.split(/(\s+)/).map((part, i) => {
-                                            const urlRegex = /(https?:\/\/[^\s]+)/g;
-                                            if (part.match(urlRegex)) {
-                                                const isImage = part.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/i);
-                                                if (isImage) {
-                                                    return (
-                                                        <div key={i} style={{ marginTop: '8px', marginBottom: '8px' }}>
-                                                            <img
-                                                                src={part}
-                                                                alt="Shared content"
-                                                                style={{
-                                                                    maxWidth: '200px',
-                                                                    maxHeight: '200px',
-                                                                    borderRadius: '12px',
-                                                                    objectFit: 'cover',
-                                                                    cursor: 'pointer',
-                                                                    border: '2px solid rgba(255,255,255,0.2)'
-                                                                }}
-                                                                onClick={() => window.open(part, '_blank')}
-                                                            />
-                                                        </div>
-                                                    );
-                                                }
-                                                return (
-                                                    <a
-                                                        key={i}
-                                                        href={part}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        style={{
-                                                            color: isMe ? '#e0e0e0' : 'var(--color-sage-green)',
-                                                            textDecoration: 'underline'
-                                                        }}
-                                                    >
-                                                        {part}
-                                                    </a>
-                                                );
-                                            }
-                                            return part;
-                                        })}
+                                        {renderMessageWithMentions(msg.message, isMe)}
                                     </div>
                                     <span style={{
                                         fontSize: '10px',
@@ -316,56 +307,22 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                         alignItems: 'center'
                     }}
                 >
-                    <div style={{ position: 'relative', flex: 1 }}>
-                        <div style={{
-                            position: 'absolute',
-                            inset: 0,
-                            padding: '13px 17px',
-                            fontSize: '14px',
-                            whiteSpace: 'pre',
-                            overflow: 'hidden',
-                            pointerEvents: 'none',
-                            fontFamily: 'inherit'
-                        }}>
-                            {newMessage.split(/(@\S+)/g).map((part, i) => (
-                                part.startsWith('@') ? (
-                                    <span key={i} style={{
-                                        color: 'var(--color-sage-green)',
-                                        fontWeight: '700',
-                                        background: 'rgba(135, 169, 107, 0.15)',
-                                        borderRadius: '4px',
-                                        textShadow: '0 0 1px rgba(0,0,0,0.05)'
-                                    }}>
-                                        {part}
-                                    </span>
-                                ) : (
-                                    <span key={i} style={{ color: 'var(--color-charcoal)' }}>{part}</span>
-                                )
-                            ))}
-                        </div>
-
-                        <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder={newMessage ? "" : "Type a message..."}
-                            disabled={!isConnected}
-                            style={{
-                                width: '100%',
-                                padding: '12px 16px',
-                                borderRadius: '24px',
-                                border: '1px solid rgba(0,0,0,0.1)',
-                                background: 'transparent',
-                                outline: 'none',
-                                fontSize: '14px',
-                                color: 'transparent',
-                                caretColor: 'var(--color-charcoal)',
-                                position: 'relative',
-                                zIndex: 1,
-                                fontFamily: 'inherit'
-                            }}
-                        />
-                    </div>
+                    <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type a message..."
+                        disabled={!isConnected}
+                        style={{
+                            flex: 1,
+                            padding: '12px 16px',
+                            borderRadius: '24px',
+                            border: '1px solid rgba(0,0,0,0.1)',
+                            background: '#F8F9FA',
+                            outline: 'none',
+                            fontSize: '14px'
+                        }}
+                    />
                     <button
                         type="submit"
                         disabled={!isConnected || !newMessage.trim()}

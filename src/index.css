@@ -47,15 +47,17 @@ body {
 
 /* Layouts */
 .container {
-  max-width: 480px;
-  /* Mobile width */
+  width: 100%;
+  max-width: 100%;
+  /* Full width */
   margin: 0 auto;
   min-height: 100vh;
-  padding: 20px;
+  padding: 20px 24px;
   padding-bottom: 100px;
   /* Space for bottom nav */
   position: relative;
   overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 h1,
@@ -151,6 +153,7 @@ textarea:focus {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
