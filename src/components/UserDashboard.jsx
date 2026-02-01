@@ -50,6 +50,14 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     const [streamingContent, setStreamingContent] = useState('');
     const [isThinking, setIsThinking] = useState(false);
 
+    // Tool Activity State for real-time visualization
+    const [toolActivity, setToolActivity] = useState({
+        status: null,        // 'reasoning' | 'writing' | null
+        statusMessage: '',
+        activeTool: null,    // { name, description, args }
+        completedTools: []   // Array of completed tool names
+    });
+
     useEffect(() => {
         fetchDashboardData();
 
@@ -170,41 +178,108 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         setIsThinking(true);
         setStreamingContent('');
 
+        // Reset tool activity
+        setToolActivity({
+            status: null,
+            statusMessage: '',
+            activeTool: null,
+            completedTools: []
+        });
+
         const optimisticMsg = { role: 'user', user_message: text, id: Date.now() };
         setMessages(prev => [...prev, optimisticMsg]);
 
         try {
-            let sessionId = currentSession?.session_id;
+            let threadId = currentSession?.session_id;
 
             await chatService.streamChatMessage(
-                { prompt: text, session_id: sessionId || null },
-                (chunk) => setStreamingContent(prev => prev + chunk),
-                (finalData) => {
-                    setIsThinking(false);
-                    setStreamingContent('');
-                    if (finalData.session_id) {
-                        if (!sessionId) {
+                { message: text, thread_id: threadId || null },
+                {
+                    onSession: (data) => {
+                        if (data.sessionId && !threadId) {
                             setCurrentSession({
-                                session_id: finalData.session_id,
+                                session_id: data.sessionId,
                                 first_user_message: text,
                                 created_at: new Date().toISOString()
                             });
                         }
-                        loadMessages(finalData.session_id);
+                    },
+                    onStatus: (data) => {
+                        setToolActivity(prev => ({
+                            ...prev,
+                            status: data.status,
+                            statusMessage: data.message
+                        }));
+                    },
+                    onToolStart: (data) => {
+                        setToolActivity(prev => ({
+                            ...prev,
+                            activeTool: {
+                                name: data.tool,
+                                description: data.description,
+                                args: data.args
+                            }
+                        }));
+                    },
+                    onToolEnd: (data) => {
+                        setToolActivity(prev => ({
+                            ...prev,
+                            activeTool: null,
+                            completedTools: [...prev.completedTools, data.tool]
+                        }));
+                    },
+                    onDelta: (chunk) => {
+                        setStreamingContent(prev => prev + chunk);
+                    },
+                    onWaitForUser: (data) => {
+                        setIsThinking(false);
+                        setToolActivity({
+                            status: null,
+                            statusMessage: '',
+                            activeTool: null,
+                            completedTools: []
+                        });
+                    },
+                    onComplete: (finalData) => {
+                        setIsThinking(false);
+                        setStreamingContent('');
+                        setToolActivity({
+                            status: null,
+                            statusMessage: '',
+                            activeTool: null,
+                            completedTools: []
+                        });
+                        if (finalData.sessionId) {
+                            loadMessages(finalData.sessionId);
+                        } else if (threadId) {
+                            loadMessages(threadId);
+                        }
+                    },
+                    onError: (err) => {
+                        console.error('Streaming error', err);
+                        setIsThinking(false);
+                        setToolActivity({
+                            status: null,
+                            statusMessage: '',
+                            activeTool: null,
+                            completedTools: []
+                        });
+                        setMessages(prev => [...prev, {
+                            role: 'assistant',
+                            ai_message: `Error: ${err.message || "I'm having trouble connecting right now. Please try again."}`
+                        }]);
                     }
-                },
-                (err) => {
-                    console.error('Streaming error', err);
-                    setIsThinking(false);
-                    setMessages(prev => [...prev, {
-                        role: 'assistant',
-                        ai_message: "I'm having trouble connecting right now. Please try again."
-                    }]);
                 }
             );
         } catch (error) {
             console.error(error);
             setIsThinking(false);
+            setToolActivity({
+                status: null,
+                statusMessage: '',
+                activeTool: null,
+                completedTools: []
+            });
         }
     };
 
@@ -429,6 +504,19 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                     messages={messages}
                     loading={isThinking}
                     streamingMessage={streamingContent}
+                    toolSteps={[
+                        // Add completed tools
+                        ...toolActivity.completedTools.map(tool => ({
+                            description: tool,
+                            loading: false
+                        })),
+                        // Add active tool if any
+                        ...(toolActivity.activeTool ? [{
+                            description: toolActivity.activeTool.description || toolActivity.activeTool.name,
+                            loading: true
+                        }] : [])
+                    ]}
+                    statusMessage={toolActivity.statusMessage}
                 />
             )}
 

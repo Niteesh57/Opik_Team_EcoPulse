@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, User, Loader2 } from 'lucide-react';
+import { X, Send, Loader2 } from 'lucide-react';
 import { eventsService } from '../services/eventsService';
 import { authService } from '../services/auth';
 
@@ -8,20 +8,38 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
     const [newMessage, setNewMessage] = useState("");
     const [isConnected, setIsConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [myUserId, setMyUserId] = useState(null);
     const ws = useRef(null);
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
 
-    // Helper to get current user ID (handles both id and user_id)
-    const getCurrentUserId = () => {
-        return currentUser?.id || currentUser?.user_id;
-    };
+    // Get current user ID on mount - use multiple methods
+    useEffect(() => {
+        // Try from prop first
+        if (currentUser?.id || currentUser?.user_id) {
+            setMyUserId(currentUser?.id || currentUser?.user_id);
+            return;
+        }
+
+        // Try from localStorage
+        try {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                const parsed = JSON.parse(storedUser);
+                if (parsed?.id || parsed?.user_id) {
+                    setMyUserId(parsed?.id || parsed?.user_id);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse stored user:', e);
+        }
+    }, [currentUser, isOpen]);
 
     // Helper to render message with @mention highlighting
     const renderMessageWithMentions = (text, isMe) => {
         if (!text) return text;
 
-        // Split by @mentions and highlight them
         const parts = text.split(/(@\w+)/g);
 
         return parts.map((part, i) => {
@@ -50,17 +68,6 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
             try {
                 setIsLoading(true);
                 const history = await eventsService.getEventMessages(eventId);
-                // The API returns messages latest first or oldest first? 
-                // Usually chat APIs might return latest, but let's assume standard list order.
-                // If it's reverse chronological (newest first), we might need to reverse.
-                // Based on "skip=0, limit=50", it likely returns standard pagination.
-                // Let's assume response order needs checking, but usually we just set them.
-                // Ideally we want oldest at top, newest at bottom.
-                // If API returns newest first (common for feeds), we reverse. 
-                // Let's assume it returns chronological or we sort.
-                // For now, let's just set them and see. If the order is wrong, we flip.
-
-                // Sort by created_at to be safe
                 const sorted = history.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                 setMessages(sorted);
             } catch (error) {
@@ -80,12 +87,6 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
 
         const connectWebSocket = () => {
             const token = authService.getToken();
-            // Use correct WS protocol (ws vs wss) based on current protocol if needed, 
-            // but here we hardcode or use env. Assuming dev is localhost.
-            // The user Request used: ws://localhost:8000/api/v1/messages/ws/${eventId}?token=${userToken}
-            // We should use the API_URL from auth service logic or env.
-            // Let's assume implicit base URL like http://localhost:8000
-
             const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
             const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
             const wsHost = apiUrl.replace(/^https?:\/\//, '');
@@ -137,9 +138,6 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
             const payload = { message: newMessage };
             ws.current.send(JSON.stringify(payload));
             setNewMessage("");
-            // Optimistic update isn't strictly needed if WS is fast, 
-            // but we rely on the server echo for ID and timestamp usually.
-            // The user provided example shows waiting for WS echo.
         }
     };
 
@@ -243,10 +241,14 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                         </div>
                     ) : (
                         messages.map((msg, index) => {
-                            // Check if current user is sender
-                            // Handle both id and user_id in currentUser object
-                            const myId = getCurrentUserId();
-                            const isMe = msg.user_id === myId || msg.username === currentUser?.username;
+                            // Check if current user is sender using multiple methods
+                            const msgUserId = msg.user_id;
+                            const propUserId = currentUser?.id || currentUser?.user_id;
+
+                            // Compare with loose equality to handle type differences
+                            const isMe = myUserId ?
+                                (msgUserId == myUserId) :
+                                (propUserId && msgUserId == propUserId);
 
                             return (
                                 <div key={msg.id || index} style={{

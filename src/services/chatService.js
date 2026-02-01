@@ -53,8 +53,10 @@ export const chatService = {
 
     /**
      * Stream a chat response with enhanced events
+     * Handles all backend events: session, status, tool_start, tool_end, wait_for_user, delta, end, error
+     * 
      * @param {Object} payload - { message, thread_id (optional) }
-     * @param {Object} callbacks - { onSession, onStatus, onToolStart, onToolEnd, onDelta, onComplete, onError }
+     * @param {Object} callbacks - Event handlers for each event type
      */
     async streamChatMessage(payload, callbacks = {}) {
         const {
@@ -69,15 +71,34 @@ export const chatService = {
         } = callbacks;
 
         try {
-            // We use authenticatedFetch directly to handle the stream manually
             const response = await authenticatedFetch(`${CHAT_BASE_URL}/stream`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || 'Streaming failed');
+                let errorMessage = `Request failed with status ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData) {
+                        // Handle FastAPI validation errors (detail can be array or string)
+                        if (typeof errorData.detail === 'string') {
+                            errorMessage = errorData.detail;
+                        } else if (Array.isArray(errorData.detail)) {
+                            // FastAPI 422 validation errors
+                            errorMessage = errorData.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+                        } else if (errorData.detail) {
+                            errorMessage = JSON.stringify(errorData.detail);
+                        } else if (errorData.message) {
+                            errorMessage = errorData.message;
+                        } else {
+                            errorMessage = JSON.stringify(errorData);
+                        }
+                    }
+                } catch (parseError) {
+                    errorMessage = response.statusText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             const reader = response.body.getReader();
@@ -91,25 +112,28 @@ export const chatService = {
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
 
-                // Process all complete lines
+                // Keep incomplete line in buffer
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
                     if (line.trim() === '') continue;
 
-                    // Remove "data: " prefix
+                    // Handle SSE format: "data: {...}"
                     if (line.startsWith('data: ')) {
                         const dataStr = line.slice(6);
                         try {
                             const data = JSON.parse(dataStr);
 
+                            // Handle error from stream
                             if (data.error) {
-                                throw new Error(data.error);
+                                onError(new Error(data.error));
+                                return;
                             }
 
-                            // Handle different event types
+                            // Handle all event types from backend
                             switch (data.event) {
                                 case 'session':
+                                    // Initial session info
                                     onSession({
                                         sessionId: data.session_id,
                                         messageId: data.message_id,
@@ -119,6 +143,7 @@ export const chatService = {
                                     break;
 
                                 case 'status':
+                                    // Status updates: "reasoning", "writing"
                                     onStatus({
                                         status: data.status,
                                         message: data.message
@@ -126,6 +151,7 @@ export const chatService = {
                                     break;
 
                                 case 'tool_start':
+                                    // Tool execution started
                                     onToolStart({
                                         tool: data.tool,
                                         description: data.description,
@@ -134,6 +160,7 @@ export const chatService = {
                                     break;
 
                                 case 'tool_end':
+                                    // Tool execution completed
                                     onToolEnd({
                                         tool: data.tool,
                                         resultPreview: data.result_preview
@@ -141,6 +168,7 @@ export const chatService = {
                                     break;
 
                                 case 'wait_for_user':
+                                    // Agent is waiting for user input (interrupt)
                                     onWaitForUser({
                                         expected: data.expected,
                                         question: data.question,
@@ -149,6 +177,7 @@ export const chatService = {
                                     break;
 
                                 case 'end':
+                                    // Stream completed
                                     onComplete({
                                         sessionId: data.session_id,
                                         messageId: data.message_id,
@@ -157,19 +186,38 @@ export const chatService = {
                                     return;
 
                                 default:
-                                    // Handle delta (text chunks)
-                                    if (data.delta) {
+                                    // Handle delta (text chunks) - no event field, just delta
+                                    if (data.delta !== undefined) {
                                         onDelta(data.delta);
                                     }
                             }
-                        } catch (e) {
-                            console.warn('Failed to parse SSE data:', line, e);
+                        } catch (parseError) {
+                            console.warn('Failed to parse SSE data:', dataStr, parseError);
                         }
                     }
                 }
             }
 
-            // Fallback completion
+            // Process any remaining buffer
+            if (buffer.trim() && buffer.startsWith('data: ')) {
+                try {
+                    const data = JSON.parse(buffer.slice(6));
+                    if (data.event === 'end') {
+                        onComplete({
+                            sessionId: data.session_id,
+                            messageId: data.message_id,
+                            assistantMessageId: data.assistant_message_id
+                        });
+                        return;
+                    } else if (data.delta !== undefined) {
+                        onDelta(data.delta);
+                    }
+                } catch (e) {
+                    // Ignore parse errors on final buffer
+                }
+            }
+
+            // Fallback completion if no explicit end event
             onComplete({});
 
         } catch (error) {
