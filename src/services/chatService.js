@@ -62,6 +62,7 @@ export const chatService = {
             onStatus = () => { },
             onToolStart = () => { },
             onToolEnd = () => { },
+            onWaitForUser = () => { },
             onDelta = () => { },
             onComplete = () => { },
             onError = () => { }
@@ -136,6 +137,14 @@ export const chatService = {
                                     onToolEnd({
                                         tool: data.tool,
                                         resultPreview: data.result_preview
+                                    });
+                                    break;
+
+                                case 'wait_for_user':
+                                    onWaitForUser({
+                                        expected: data.expected,
+                                        question: data.question,
+                                        sessionId: data.session_id
                                     });
                                     break;
 

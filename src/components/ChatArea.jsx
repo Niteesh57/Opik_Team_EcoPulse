@@ -1,8 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { User, Bot, Loader2, CheckCircle2, Circle } from 'lucide-react';
+import { User, Bot, Loader2, CheckCircle2, Circle, MessageSquare } from 'lucide-react';
 
-const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage }) => {
+const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage, waitingForUser }) => {
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -11,7 +11,7 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, streamingMessage, toolSteps]);
+    }, [messages, streamingMessage, toolSteps, waitingForUser]);
 
     return (
         <div style={{
@@ -50,41 +50,55 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                         <div key={msg.id || idx} style={{
                             display: 'flex',
                             flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
-                            gap: '12px',
-                            alignItems: 'flex-start'
+                            gap: '14px',
+                            alignItems: 'flex-start',
+                            maxWidth: '100%'
                         }}>
                             {/* Avatar */}
                             <div style={{
-                                width: '32px', height: '32px',
-                                borderRadius: '50%',
-                                background: msg.role === 'user' ? 'var(--color-charcoal)' : 'var(--color-sage-green)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '12px',
+                                background: msg.role === 'user'
+                                    ? 'linear-gradient(135deg, #1d1d1f 0%, #3a3a3c 100%)'
+                                    : 'linear-gradient(135deg, var(--color-sage-green) 0%, #5d7d4a 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                boxShadow: msg.role === 'user'
+                                    ? '0 4px 12px rgba(0, 0, 0, 0.15)'
+                                    : '0 4px 12px rgba(135, 169, 107, 0.3)'
                             }}>
                                 {msg.role === 'user' ? (
-                                    <User size={16} color="white" />
+                                    <User size={18} color="white" />
                                 ) : (
-                                    <Bot size={16} color="white" />
+                                    <Bot size={18} color="white" />
                                 )}
                             </div>
 
                             {/* Message Bubble */}
                             <div style={{
-                                maxWidth: '80%',
-                                padding: '12px 16px',
+                                maxWidth: 'min(75%, 600px)',
+                                padding: '14px 18px',
                                 borderRadius: msg.role === 'user' ?
-                                    '20px 20px 4px 20px' :
-                                    '20px 20px 20px 4px',
+                                    '20px 20px 6px 20px' :
+                                    '20px 20px 20px 6px',
                                 background: msg.role === 'user' ?
-                                    'var(--color-charcoal)' :
-                                    'white',
+                                    'linear-gradient(135deg, #1d1d1f 0%, #2c2c2e 100%)' :
+                                    'rgba(255, 255, 255, 0.9)',
                                 color: msg.role === 'user' ? 'white' : 'var(--color-charcoal)',
-                                boxShadow: msg.role !== 'user' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                                boxShadow: msg.role === 'user'
+                                    ? '0 4px 16px rgba(0, 0, 0, 0.12)'
+                                    : '0 4px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
+                                backdropFilter: msg.role !== 'user' ? 'blur(20px)' : 'none',
+                                WebkitBackdropFilter: msg.role !== 'user' ? 'blur(20px)' : 'none',
                                 fontSize: '15px',
-                                lineHeight: '1.5'
+                                lineHeight: '1.6',
+                                letterSpacing: '-0.01em'
                             }}>
                                 {msg.role === 'user' ? (
-                                    <p style={{ margin: 0 }}>{msg.user_message || msg.content}</p>
+                                    <p style={{ margin: 0, color: 'inherit' }}>{msg.user_message || msg.content}</p>
                                 ) : (
                                     <div className="markdown-content">
                                         <ReactMarkdown>
@@ -162,29 +176,41 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                     {streamingMessage && (
                         <div style={{
                             display: 'flex',
-                            gap: '12px',
+                            gap: '14px',
                             alignItems: 'flex-start'
                         }}>
                             <div style={{
-                                width: '32px', height: '32px',
-                                borderRadius: '50%',
-                                background: 'var(--color-sage-green)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '12px',
+                                background: 'linear-gradient(135deg, var(--color-sage-green) 0%, #5d7d4a 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                boxShadow: '0 4px 12px rgba(135, 169, 107, 0.3)'
                             }}>
-                                <Bot size={16} color="white" />
+                                <Bot size={18} color="white" />
                             </div>
                             <div style={{
-                                maxWidth: '80%',
-                                padding: '12px 16px',
-                                borderRadius: '20px 20px 20px 4px',
-                                background: 'white',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                                maxWidth: 'min(75%, 600px)',
+                                padding: '14px 18px',
+                                borderRadius: '20px 20px 20px 6px',
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                backdropFilter: 'blur(20px)',
+                                WebkitBackdropFilter: 'blur(20px)',
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
                                 fontSize: '15px',
-                                lineHeight: '1.5'
+                                lineHeight: '1.6',
+                                letterSpacing: '-0.01em'
                             }}>
                                 <div className="markdown-content">
-                                    <ReactMarkdown>{streamingMessage}</ReactMarkdown>
+                                    <ReactMarkdown components={{
+                                        p: ({ children }) => <p className="streaming-p">{children}</p>
+                                    }}>
+                                        {streamingMessage}
+                                    </ReactMarkdown>
+                                    <span className="streaming-cursor">▍</span>
                                 </div>
                             </div>
                         </div>
@@ -196,6 +222,64 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                             <div className="typing-dot" style={{ animationDelay: '0s' }} />
                             <div className="typing-dot" style={{ animationDelay: '0.2s' }} />
                             <div className="typing-dot" style={{ animationDelay: '0.4s' }} />
+                        </div>
+                    )}
+
+                    {/* Waiting for User Input */}
+                    {waitingForUser && (
+                        <div style={{
+                            marginLeft: '44px',
+                            padding: '16px 20px',
+                            background: 'linear-gradient(135deg, rgba(135, 169, 107, 0.15) 0%, rgba(135, 169, 107, 0.08) 100%)',
+                            border: '2px solid var(--color-sage-green)',
+                            borderRadius: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            animation: 'waitingPulse 2s ease-in-out infinite'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}>
+                                <div className="waiting-icon-wrapper">
+                                    <MessageSquare size={18} color="var(--color-sage-green)" />
+                                </div>
+                                <span style={{
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    color: 'var(--color-sage-green)'
+                                }}>
+                                    Your input is needed
+                                </span>
+                            </div>
+                            <p style={{
+                                margin: 0,
+                                fontSize: '13px',
+                                color: 'var(--color-charcoal)',
+                                opacity: 0.8,
+                                lineHeight: '1.5'
+                            }}>
+                                {waitingForUser.question || 'Please type your response below to continue the conversation...'}
+                            </p>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                marginTop: '4px'
+                            }}>
+                                <div className="input-arrow-animation">
+                                    <span style={{ fontSize: '16px' }}>↓</span>
+                                </div>
+                                <span style={{
+                                    fontSize: '12px',
+                                    color: 'var(--color-text-secondary)',
+                                    fontWeight: '500'
+                                }}>
+                                    Type in the message box below
+                                </span>
+                            </div>
                         </div>
                     )}
                 </>
@@ -246,6 +330,61 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                     padding: 12px;
                     border-radius: 8px;
                     overflow-x: auto;
+                }
+                
+                /* Waiting for user input animations */
+                @keyframes waitingPulse {
+                    0%, 100% { 
+                        box-shadow: 0 0 0 0 rgba(135, 169, 107, 0.4);
+                    }
+                    50% { 
+                        box-shadow: 0 0 0 8px rgba(135, 169, 107, 0);
+                    }
+                }
+                
+                .waiting-icon-wrapper {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    animation: iconBounce 1s ease-in-out infinite;
+                }
+                
+                @keyframes iconBounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-3px); }
+                }
+                
+                .input-arrow-animation {
+                    animation: arrowBounce 1.5s ease-in-out infinite;
+                    color: var(--color-sage-green);
+                }
+                
+                @keyframes arrowBounce {
+                    0%, 100% { 
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                    50% { 
+                        transform: translateY(5px);
+                        opacity: 0.6;
+                    }
+                }
+
+                .streaming-cursor {
+                    display: inline-block;
+                    color: var(--color-sage-green);
+                    margin-left: 2px;
+                    animation: blink 1s step-end infinite;
+                    vertical-align: baseline;
+                }
+
+                @keyframes blink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0; }
+                }
+
+                .streaming-p {
+                    display: inline; /* Keep paragraph inline to allow cursor to sit next to it */
                 }
             `}</style>
         </div>

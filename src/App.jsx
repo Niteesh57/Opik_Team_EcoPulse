@@ -39,18 +39,16 @@ function AppContent() {
 
   const handleLogin = async (userData) => {
     setUser(userData);
-
+    
     if (userData.role === 'admin') {
-      // Immediately set room status for admins to prevent flash
       setRoomStatus({ hasRoom: true, isAdmin: true });
-      // Use setTimeout to ensure state is set before navigation
-      setTimeout(() => navigate('/admin'), 0);
+      navigate('/admin');
     } else {
       // For regular users, check room status
       const userRoomStatus = await authService.checkUserRoomStatus();
       const status = userRoomStatus ? { hasRoom: true, room: userRoomStatus } : { hasRoom: false };
       setRoomStatus(status);
-
+      
       if (status.hasRoom) {
         navigate('/dashboard');
       } else {
@@ -90,8 +88,8 @@ function AppContent() {
     <Routes>
       <Route path="/" element={
         user ? (
-          user.role === 'admin' ?
-            <Navigate to="/admin" replace /> :
+          user.role === 'admin' ? 
+            <Navigate to="/admin" replace /> : 
             (roomStatus?.hasRoom ? <Navigate to="/dashboard" replace /> : <Navigate to="/join-room" replace />)
         ) : <Login onLogin={handleLogin} />
       } />
@@ -99,11 +97,11 @@ function AppContent() {
         path="/join-room"
         element={
           user && user.role === 'user' && !roomStatus?.hasRoom ? (
-            <JoinRoom onRoomJoined={handleRoomJoined} onLogout={handleLogout} />
+            <JoinRoom onRoomJoined={handleRoomJoined} />
           ) : (
             user ? (
-              user.role === 'admin' ?
-                <Navigate to="/admin" replace /> :
+              user.role === 'admin' ? 
+                <Navigate to="/admin" replace /> : 
                 <Navigate to="/dashboard" replace />
             ) : <Navigate to="/" replace />
           )
@@ -115,7 +113,7 @@ function AppContent() {
           user && user.role === 'user' && roomStatus?.hasRoom ? (
             <UserDashboard userName={user.username} onLogout={handleLogout} roomInfo={roomStatus.room} />
           ) : (
-            user && user.role === 'user' && !roomStatus?.hasRoom ?
+            user && user.role === 'user' && !roomStatus?.hasRoom ? 
               <Navigate to="/join-room" replace /> :
               <Navigate to="/" replace />
           )
