@@ -1,0 +1,32 @@
+.share-popup {
+	position: absolute;
+	background: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+	padding: 8px;
+	border-radius: 6px;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 160px;
+}
+
+.share-btn {
+	padding: 8px 10px;
+	border: none;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+	border-radius: 4px;
+	font-size: 14px;
+}
+.share-btn:hover {
+	background: rgba(0, 0, 0, 0.04);
+}
+.share-btn.fb {
+	color: #1877f2;
+}
+.share-btn.ig {
+	color: #e1306c;
+}
