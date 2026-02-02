@@ -132,6 +132,21 @@ export const api = {
         return response.json();
     },
 
+    async patch(endpoint, data, options = {}) {
+        const response = await authenticatedFetch(endpoint, {
+            ...options,
+            method: 'PATCH',
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || 'Request failed');
+        }
+        
+        return response.json();
+    },
+
     async delete(endpoint, options = {}) {
         const response = await authenticatedFetch(endpoint, {
             ...options,

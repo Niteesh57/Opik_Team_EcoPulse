@@ -13,6 +13,41 @@ const JoinRoom = ({ onRoomJoined, onLogout }) => {
     const [showCelebration, setShowCelebration] = useState(false);
     const [roomData, setRoomData] = useState(null);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [isChecking, setIsChecking] = useState(true);
+    const [checkError, setCheckError] = useState('');
+
+    // Check if user is already in a room on component mount
+    React.useEffect(() => {
+        const checkExistingRoom = async () => {
+            try {
+                setIsChecking(true);
+                setCheckError('');
+                
+                // Add minimum delay to ensure animation is visible
+                const [response] = await Promise.all([
+                    roomService.checkUserRoom(),
+                    new Promise(resolve => setTimeout(resolve, 800)) // Minimum 800ms to show animation
+                ]);
+                
+                // User already has a room
+                if (response && response.room) {
+                    setRoomData(response.room);
+                    // Auto-redirect to dashboard after brief delay
+                    setTimeout(() => {
+                        onRoomJoined(response.room);
+                    }, 1000);
+                }
+            } catch (err) {
+                // User doesn't have a room yet, which is expected
+                // setCheckError is not needed for this normal case
+                console.log('User not yet in a room:', err.message);
+            } finally {
+                setIsChecking(false);
+            }
+        };
+
+        checkExistingRoom();
+    }, [onRoomJoined]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -62,6 +97,156 @@ const JoinRoom = ({ onRoomJoined, onLogout }) => {
 
     if (showCelebration && roomData) {
         return <RoomJoinCelebration roomData={roomData} onComplete={handleCelebrationComplete} />;
+    }
+
+    // Show loading animation while checking if user is already in a room
+    if (isChecking) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, var(--color-sage-green) 0%, var(--color-soft-mint) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+            }}>
+                <div style={{
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '32px'
+                }}>
+                    {/* Animated circle loader */}
+                    <div style={{
+                        position: 'relative',
+                        width: '100px',
+                        height: '100px'
+                    }}>
+                        {/* Outer rotating circle */}
+                        <div style={{
+                            position: 'absolute',
+                            width: '100px',
+                            height: '100px',
+                            borderRadius: '50%',
+                            border: '4px solid rgba(255,255,255,0.3)',
+                            borderTop: '4px solid white',
+                            animation: 'spin 1s linear infinite'
+                        }} />
+                        
+                        {/* Middle pulsing circle */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '15px',
+                            left: '15px',
+                            width: '70px',
+                            height: '70px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)',
+                            animation: 'pulse 2s ease-in-out infinite'
+                        }} />
+                        
+                        {/* Center icon */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '40px',
+                            height: '40px',
+                            background: 'white',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10
+                        }}>
+                            <Users size={24} color="var(--color-sage-green)" />
+                        </div>
+                    </div>
+
+                    {/* Text content */}
+                    <div>
+                        <h2 style={{
+                            fontSize: '24px',
+                            fontWeight: '700',
+                            color: 'white',
+                            marginBottom: '12px',
+                            letterSpacing: '-0.5px'
+                        }}>
+                            Checking Your Community Status
+                        </h2>
+                        <p style={{
+                            fontSize: '16px',
+                            color: 'rgba(255,255,255,0.8)',
+                            lineHeight: '1.5',
+                            maxWidth: '300px'
+                        }}>
+                            Verifying if you're already a member of a community...
+                        </p>
+                    </div>
+
+                    {/* Loading dots */}
+                    <div style={{
+                        display: 'flex',
+                        gap: '8px',
+                        justifyContent: 'center'
+                    }}>
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.6)',
+                            animation: 'bounce 1.4s ease-in-out infinite',
+                            animationDelay: '0s'
+                        }} />
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.6)',
+                            animation: 'bounce 1.4s ease-in-out infinite',
+                            animationDelay: '0.2s'
+                        }} />
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.6)',
+                            animation: 'bounce 1.4s ease-in-out infinite',
+                            animationDelay: '0.4s'
+                        }} />
+                    </div>
+                </div>
+
+                <style>{`
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    @keyframes pulse {
+                        0%, 100% { 
+                            transform: scale(1);
+                            opacity: 0.1;
+                        }
+                        50% { 
+                            transform: scale(1.2);
+                            opacity: 0.2;
+                        }
+                    }
+                    @keyframes bounce {
+                        0%, 100% { 
+                            transform: translateY(0);
+                            opacity: 0.6;
+                        }
+                        50% { 
+                            transform: translateY(-10px);
+                            opacity: 1;
+                        }
+                    }
+                `}</style>
+            </div>
+        );
     }
 
     const handleInputChange = (field, value) => {

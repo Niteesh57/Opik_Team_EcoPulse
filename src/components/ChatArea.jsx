@@ -1,11 +1,14 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { User, Bot, Loader2, CheckCircle2, Circle, MessageSquare } from 'lucide-react';
+import { User, Bot, Loader2, CheckCircle2, Circle, MessageSquare, ThumbsUp, ThumbsDown } from 'lucide-react';
 import AIProcessingIndicator from './AIProcessingIndicator';
+import { api } from '../services/api';
 
 const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage, waitingForUser }) => {
     const messagesEndRef = useRef(null);
+    const [feedbackStates, setFeedbackStates] = useState({});
+    const [feedbackLoading, setFeedbackLoading] = useState({});
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -14,6 +17,58 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
     useEffect(() => {
         scrollToBottom();
     }, [messages, streamingMessage, toolSteps, waitingForUser]);
+
+    // Initialize feedback states from messages
+    useEffect(() => {
+        const initialFeedback = {};
+        messages.forEach(msg => {
+            if (msg.id && msg.role === 'assistant') {
+                initialFeedback[msg.id] = {
+                    liked: msg.liked || false,
+                    disliked: msg.disliked || false
+                };
+            }
+        });
+        setFeedbackStates(initialFeedback);
+    }, [messages]);
+
+    const submitFeedback = async (messageId, isLiked) => {
+        setFeedbackLoading(prev => ({ ...prev, [messageId]: true }));
+        
+        try {
+            const currentState = feedbackStates[messageId] || { liked: false, disliked: false };
+            
+            // Determine new state
+            let newLiked, newDisliked;
+            if (isLiked) {
+                newLiked = !currentState.liked; // Toggle like
+                newDisliked = false;
+            } else {
+                newLiked = false;
+                newDisliked = !currentState.disliked; // Toggle dislike
+            }
+            
+            const response = await api.patch(`/chat/messages/${messageId}/feedback`, {
+                liked: newLiked || null,
+                disliked: newDisliked || null
+            });
+            
+            // Update local state with response
+            setFeedbackStates(prev => ({
+                ...prev,
+                [messageId]: {
+                    liked: response.liked || false,
+                    disliked: response.disliked || false
+                }
+            }));
+            
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            // Could show a toast notification here
+        } finally {
+            setFeedbackLoading(prev => ({ ...prev, [messageId]: false }));
+        }
+    };
 
     return (
         <div style={{
@@ -49,7 +104,7 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
             ) : (
                 <>
                     {messages.map((msg, idx) => (
-                        <div key={msg.id || idx} style={{
+                        <div key={msg.id || idx} className="message-item" style={{
                             display: 'flex',
                             flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
                             gap: '14px',
@@ -79,26 +134,27 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                 )}
                             </div>
 
-                            {/* Message Bubble */}
-                            <div style={{
-                                maxWidth: 'min(75%, 600px)',
-                                padding: '14px 18px',
-                                borderRadius: msg.role === 'user' ?
-                                    '20px 20px 6px 20px' :
-                                    '20px 20px 20px 6px',
-                                background: msg.role === 'user' ?
-                                    'linear-gradient(135deg, #1d1d1f 0%, #2c2c2e 100%)' :
-                                    'rgba(255, 255, 255, 0.9)',
-                                color: msg.role === 'user' ? 'white' : 'var(--color-charcoal)',
-                                boxShadow: msg.role === 'user'
-                                    ? '0 4px 16px rgba(0, 0, 0, 0.12)'
-                                    : '0 4px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
-                                backdropFilter: msg.role !== 'user' ? 'blur(20px)' : 'none',
-                                WebkitBackdropFilter: msg.role !== 'user' ? 'blur(20px)' : 'none',
-                                fontSize: '15px',
-                                lineHeight: '1.6',
-                                letterSpacing: '-0.01em'
-                            }}>
+                            {/* Message Bubble and Feedback Container */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: 'min(75%, 600px)' }}>
+                                {/* Message Bubble */}
+                                <div style={{
+                                    padding: '14px 18px',
+                                    borderRadius: msg.role === 'user' ?
+                                        '20px 20px 6px 20px' :
+                                        '20px 20px 20px 6px',
+                                    background: msg.role === 'user' ?
+                                        'linear-gradient(135deg, #1d1d1f 0%, #2c2c2e 100%)' :
+                                        'rgba(255, 255, 255, 0.9)',
+                                    color: msg.role === 'user' ? 'white' : 'var(--color-charcoal)',
+                                    boxShadow: msg.role === 'user'
+                                        ? '0 4px 16px rgba(0, 0, 0, 0.12)'
+                                        : '0 4px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
+                                    backdropFilter: msg.role !== 'user' ? 'blur(20px)' : 'none',
+                                    WebkitBackdropFilter: msg.role !== 'user' ? 'blur(20px)' : 'none',
+                                    fontSize: '15px',
+                                    lineHeight: '1.6',
+                                    letterSpacing: '-0.01em'
+                                }}>
                                 {msg.role === 'user' ? (
                                     <p style={{ margin: 0, color: 'inherit' }}>{msg.user_message || msg.content}</p>
                                 ) : (
@@ -192,12 +248,95 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                         </ReactMarkdown>
                                     </div>
                                 )}
+                                </div>
+                                
+                                {/* Feedback Buttons - Only for AI messages */}
+                                {msg.role === 'assistant' && msg.id && (
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        gap: '8px', 
+                                        paddingLeft: '4px',
+                                        opacity: feedbackLoading[msg.id] ? 0.5 : 1
+                                    }}>
+                                        <button
+                                            onClick={() => submitFeedback(msg.id, true)}
+                                            disabled={feedbackLoading[msg.id]}
+                                            style={{
+                                                background: feedbackStates[msg.id]?.liked 
+                                                    ? 'rgba(34, 197, 94, 0.15)' 
+                                                    : 'rgba(0, 0, 0, 0.04)',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                padding: '6px 10px',
+                                                cursor: feedbackLoading[msg.id] ? 'not-allowed' : 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!feedbackLoading[msg.id]) {
+                                                    e.currentTarget.style.background = feedbackStates[msg.id]?.liked
+                                                        ? 'rgba(34, 197, 94, 0.25)'
+                                                        : 'rgba(0, 0, 0, 0.08)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = feedbackStates[msg.id]?.liked
+                                                    ? 'rgba(34, 197, 94, 0.15)'
+                                                    : 'rgba(0, 0, 0, 0.04)';
+                                            }}
+                                        >
+                                            <ThumbsUp 
+                                                size={14} 
+                                                color={feedbackStates[msg.id]?.liked ? '#22c55e' : '#666'}
+                                                fill={feedbackStates[msg.id]?.liked ? '#22c55e' : 'none'}
+                                            />
+                                        </button>
+                                        
+                                        <button
+                                            onClick={() => submitFeedback(msg.id, false)}
+                                            disabled={feedbackLoading[msg.id]}
+                                            style={{
+                                                background: feedbackStates[msg.id]?.disliked 
+                                                    ? 'rgba(239, 68, 68, 0.15)' 
+                                                    : 'rgba(0, 0, 0, 0.04)',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                padding: '6px 10px',
+                                                cursor: feedbackLoading[msg.id] ? 'not-allowed' : 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!feedbackLoading[msg.id]) {
+                                                    e.currentTarget.style.background = feedbackStates[msg.id]?.disliked
+                                                        ? 'rgba(239, 68, 68, 0.25)'
+                                                        : 'rgba(0, 0, 0, 0.08)';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = feedbackStates[msg.id]?.disliked
+                                                    ? 'rgba(239, 68, 68, 0.15)'
+                                                    : 'rgba(0, 0, 0, 0.04)';
+                                            }}
+                                        >
+                                            <ThumbsDown 
+                                                size={14} 
+                                                color={feedbackStates[msg.id]?.disliked ? '#ef4444' : '#666'}
+                                                fill={feedbackStates[msg.id]?.disliked ? '#ef4444' : 'none'}
+                                            />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
 
                     {/* AI Processing Indicator - Glassy Animated Design */}
-                    {(loading || (toolSteps && toolSteps.length > 0) || statusMessage) && (
+                    {((toolSteps && toolSteps.length > 0) || statusMessage) && (
                         <AIProcessingIndicator
                             isProcessing={loading}
                             statusMessage={statusMessage}
@@ -206,12 +345,13 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                         />
                     )}
 
-                    {/* Streaming Message */}
-                    {streamingMessage && (
-                        <div style={{
+                    {/* Unified AI Response Area (Streaming or Loading) */}
+                    {(loading || streamingMessage) && !statusMessage && (
+                        <div className="streaming-container" style={{
                             display: 'flex',
                             gap: '14px',
-                            alignItems: 'flex-start'
+                            alignItems: 'flex-start',
+                            transition: 'all 0.3s ease'
                         }}>
                             <div style={{
                                 width: '36px',
@@ -226,6 +366,7 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                             }}>
                                 <Bot size={18} color="white" />
                             </div>
+                            
                             <div style={{
                                 maxWidth: 'min(75%, 600px)',
                                 padding: '14px 18px',
@@ -236,26 +377,27 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
                                 fontSize: '15px',
                                 lineHeight: '1.6',
-                                letterSpacing: '-0.01em'
+                                letterSpacing: '-0.01em',
+                                transition: 'all 0.3s ease'
                             }}>
-                                <div className="markdown-content">
-                                    <ReactMarkdown components={{
-                                        p: ({ children }) => <p className="streaming-p">{children}</p>
-                                    }}>
-                                        {streamingMessage}
-                                    </ReactMarkdown>
-                                    <span className="streaming-cursor">▍</span>
-                                </div>
+                                {streamingMessage ? (
+                                    <div className="markdown-content">
+                                        <ReactMarkdown components={{
+                                            p: ({ children }) => <p className="streaming-p">{children}</p>
+                                        }}>
+                                            {streamingMessage}
+                                        </ReactMarkdown>
+                                        <span className="streaming-cursor">▍</span>
+                                    </div>
+                                ) : (
+                                    /* The dots now live INSIDE the bubble until text arrives */
+                                    <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+                                        <div className="typing-dot" style={{ animationDelay: '0s' }} />
+                                        <div className="typing-dot" style={{ animationDelay: '0.2s' }} />
+                                        <div className="typing-dot" style={{ animationDelay: '0.4s' }} />
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
-
-                    {/* Loading Indicator */}
-                    {loading && !streamingMessage && !statusMessage && (
-                        <div style={{ display: 'flex', gap: '4px', marginLeft: '44px' }}>
-                            <div className="typing-dot" style={{ animationDelay: '0s' }} />
-                            <div className="typing-dot" style={{ animationDelay: '0.2s' }} />
-                            <div className="typing-dot" style={{ animationDelay: '0.4s' }} />
                         </div>
                     )}
 
@@ -321,6 +463,11 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
             <div ref={messagesEndRef} />
 
             <style>{`
+                .message-item {
+                    animation: none;
+                    opacity: 1;
+                }
+                
                 .typing-dot {
                     width: 8px;
                     height: 8px;
@@ -348,6 +495,23 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                 @keyframes pulse {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.3; }
+                }
+                
+                /* Bubble entry animation for EcoPulse feel */
+                @keyframes bubbleEntry {
+                    from { 
+                        opacity: 0; 
+                        transform: translateY(10px) scale(0.95); 
+                    }
+                    to { 
+                        opacity: 1; 
+                        transform: translateY(0) scale(1); 
+                    }
+                }
+                
+                .streaming-container {
+                    animation: none;
+                    opacity: 1;
                 }
                 
                 /* Basic markdown styles */

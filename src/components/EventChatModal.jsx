@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Loader2 } from 'lucide-react';
+import { X, Send, Loader2, Share2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { eventsService } from '../services/eventsService';
@@ -86,6 +86,41 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
             url.includes('i.ibb.co') ||
             url.includes('imgur.com') ||
             url.includes('cloudinary.com');
+    };
+
+    const ShareButtons = ({ url }) => {
+        const shareOnFacebook = () => {
+            const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+            window.open(shareUrl, '_blank', 'noopener,noreferrer');
+        };
+
+        const shareOnInstagram = () => {
+            // Instagram does not support direct web sharing with a pre-filled image.
+            // This will open Instagram, and the user can manually post.
+            // A better UX would be to copy the link or guide the user.
+            window.open('https://www.instagram.com', '_blank', 'noopener,noreferrer');
+        };
+
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginTop: '8px',
+                padding: '4px 8px',
+                background: 'rgba(0,0,0,0.03)',
+                borderRadius: '8px',
+                alignSelf: 'flex-start'
+            }}>
+                <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)' }}>Share:</span>
+                <button onClick={shareOnFacebook} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-facebook"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                </button>
+                <button onClick={shareOnInstagram} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-instagram"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+                </button>
+            </div>
+        );
     };
 
     // Markdown components with custom styling
@@ -193,6 +228,7 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                     onClick={() => window.open(src, '_blank')}
                     onError={(e) => { e.target.style.display = 'none'; }}
                 />
+                <ShareButtons url={src} />
             </div>
         ),
         // Code blocks
@@ -426,8 +462,62 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                     }}
                 >
                     {isLoading ? (
-                        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '40px' }}>
-                            <Loader2 className="spinning" color="var(--color-sage-green)" />
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            height: '100%',
+                            gap: '20px'
+                        }}>
+                            {/* Animated spinner */}
+                            <div style={{
+                                position: 'relative',
+                                width: '60px',
+                                height: '60px'
+                            }}>
+                                {/* Outer rotating circle */}
+                                <div style={{
+                                    position: 'absolute',
+                                    width: '60px',
+                                    height: '60px',
+                                    borderRadius: '50%',
+                                    border: '3px solid rgba(135, 169, 107, 0.2)',
+                                    borderTop: '3px solid var(--color-sage-green)',
+                                    animation: 'spin 1s linear infinite'
+                                }} />
+                                
+                                {/* Inner pulsing circle */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '10px',
+                                    left: '10px',
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '50%',
+                                    background: 'rgba(135, 169, 107, 0.1)',
+                                    animation: 'pulse 2s ease-in-out infinite'
+                                }} />
+                            </div>
+                            
+                            {/* Loading text */}
+                            <div style={{ textAlign: 'center' }}>
+                                <p style={{
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    color: 'var(--color-charcoal)',
+                                    margin: '0 0 6px 0'
+                                }}>
+                                    Loading Chat
+                                </p>
+                                <p style={{
+                                    fontSize: '12px',
+                                    color: 'var(--color-text-secondary)',
+                                    margin: 0
+                                }}>
+                                    Retrieving messages...
+                                </p>
+                            </div>
                         </div>
                     ) : messages.length === 0 ? (
                         <div style={{ textAlign: 'center', marginTop: '40px', color: 'var(--color-text-secondary)' }}>
@@ -589,6 +679,22 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                     @keyframes modalSlideIn {
                         from { opacity: 0; transform: scale(0.95) translateY(10px); }
                         to { opacity: 1; transform: scale(1) translateY(0); }
+                    }
+                    
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    
+                    @keyframes pulse {
+                        0%, 100% { 
+                            transform: scale(1);
+                            opacity: 0.1;
+                        }
+                        50% { 
+                            transform: scale(1.2);
+                            opacity: 0.2;
+                        }
                     }
                 `}</style>
             </div>
