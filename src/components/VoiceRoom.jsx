@@ -42,7 +42,7 @@ export default function VoiceRoom({ isOpen, onClose }) {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
     const wsHost = apiUrl.replace(/^https?:\/\//, '');
-    const wsUrl = `${wsProtocol}://${wsHost}/api/v1/voice/ws/${roomId}/${userLang}`;
+    const wsUrl = `${wsProtocol}://${wsHost}/api/v1/voice/voice/ws/${roomId}/${userLang}`;
     
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
