@@ -39,7 +39,7 @@ export default function VoiceRoom({ isOpen, onClose }) {
   async function join() {
     if (!roomId.trim()) return alert("Enter room ID");
 
-    const wsUrl = import.meta.env.VITE_WS_BASE_URL || 'ws://127.0.0.1:8000';
+    const wsUrl = import.meta.env.VITE_WS_BASE_URL || '';
     const ws = new WebSocket(
       `${wsUrl}/api/v1/voice/ws/${roomId}/${userLang}`
     );
