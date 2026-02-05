@@ -5,6 +5,11 @@ import { User, Bot, Loader2, CheckCircle2, Circle, MessageSquare, ThumbsUp, Thum
 import AIProcessingIndicator from './AIProcessingIndicator';
 import { api } from '../services/api';
 
+// Define these OUTSIDE the component to prevent re-creation on every render (Lag Fix)
+const STREAMING_MARKDOWN_COMPONENTS = {
+    p: ({ children }) => <p className="streaming-p">{children}</p>
+};
+
 const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage, waitingForUser }) => {
     const messagesEndRef = useRef(null);
     const [feedbackStates, setFeedbackStates] = useState({});
@@ -70,6 +75,13 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
         }
     };
 
+    const lastMessageRef = useRef();
+    useEffect(() => {
+      lastMessageRef.current = messages;
+    });
+    const renderedMessages = streamingMessage ? lastMessageRef.current : messages;
+
+
     return (
         <div style={{
             flex: 1,
@@ -81,7 +93,7 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
             gap: '24px'
         }} className="no-scrollbar">
 
-            {messages.length === 0 && !loading && !streamingMessage ? (
+            {renderedMessages.length === 0 && !loading && !streamingMessage ? (
                 <div style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -103,7 +115,9 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                 </div>
             ) : (
                 <>
-                    {messages.map((msg, idx) => (
+                    {renderedMessages
+                        .filter(msg => (msg.content || msg.user_message || msg.ai_message)) // FIX: Don't render empty messages
+                        .map((msg, idx) => (
                         <div key={msg.id || idx} className="message-item" style={{
                             display: 'flex',
                             flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
@@ -345,14 +359,17 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                         />
                     )}
 
-                    {/* Unified AI Response Area (Streaming or Loading) */}
-                    {(loading || streamingMessage) && !statusMessage && (
+                    {/* FIXED: Unified AI Response Area */}
+                    {/* Logic changed: Always show if we have text (streamingMessage), 
+                otherwise only show loading dots if there is NO status message */}
+                    {(streamingMessage || (loading && !statusMessage)) && (
                         <div className="streaming-container" style={{
                             display: 'flex',
                             gap: '14px',
                             alignItems: 'flex-start',
                             transition: 'all 0.3s ease'
                         }}>
+                            {/* Bot Avatar */}
                             <div style={{
                                 width: '36px',
                                 height: '36px',
@@ -367,6 +384,7 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                 <Bot size={18} color="white" />
                             </div>
                             
+                            {/* Streaming Bubble */}
                             <div style={{
                                 maxWidth: 'min(75%, 600px)',
                                 padding: '14px 18px',
@@ -382,15 +400,14 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                             }}>
                                 {streamingMessage ? (
                                     <div className="markdown-content">
-                                        <ReactMarkdown components={{
-                                            p: ({ children }) => <p className="streaming-p">{children}</p>
-                                        }}>
+                                        {/* Use the constant defined outside for better performance */}
+                                        <ReactMarkdown components={STREAMING_MARKDOWN_COMPONENTS}>
                                             {streamingMessage}
                                         </ReactMarkdown>
                                         <span className="streaming-cursor">▍</span>
                                     </div>
                                 ) : (
-                                    /* The dots now live INSIDE the bubble until text arrives */
+                                    /* Loading dots (only visible if no status message) */
                                     <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
                                         <div className="typing-dot" style={{ animationDelay: '0s' }} />
                                         <div className="typing-dot" style={{ animationDelay: '0.2s' }} />

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, User } from 'lucide-react';
+import { Home, User, Phone } from 'lucide-react';
 
-const BottomNavigation = ({ activeTab, onTabChange }) => {
+const BottomNavigation = ({ activeTab, onTabChange, onCallClick }) => {
     return (
         <div style={{
             position: 'fixed',
@@ -57,6 +57,25 @@ const BottomNavigation = ({ activeTab, onTabChange }) => {
             >
                 <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
                 <span style={{ fontSize: '11px', fontWeight: activeTab === 'profile' ? '600' : '500' }}>Profile</span>
+            </div>
+
+            {/* Call Button */}
+            <div
+                onClick={() => onCallClick && onCallClick()}
+                style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#999',
+                    cursor: 'pointer',
+                    padding: '8px 0',
+                    transition: 'color 0.2s'
+                }}
+            >
+                <Phone size={24} strokeWidth={2} />
+                <span style={{ fontSize: '11px', fontWeight: '500' }}>Call</span>
             </div>
         </div>
     );

@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles } from 'lucide-react';
 
 const ChatInput = ({ onSend, disabled }) => {
     const [message, setMessage] = useState('');
     const [isFocused, setIsFocused] = useState(false);
+    const textareaRef = useRef(null);
 
+    const handleInputChange = (e) => {
+        setMessage(e.target.value);
+    };
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '24px'; // Reset height to single line
+            const scrollHeight = textareaRef.current.scrollHeight;
+            textareaRef.current.style.height = `${scrollHeight}px`;
+        }
+    }, [message]);
+    
     const handleSubmit = (e) => {
         e.preventDefault();
         if (message.trim() && !disabled && onSend) {
@@ -27,17 +40,18 @@ const ChatInput = ({ onSend, disabled }) => {
             <style>{`
                 .chat-input-container {
                     max-width: 800px;
+                    align-items: flex-end; /* Align items to bottom for multiline */
                 }
                 @media (min-width: 768px) {
                     .chat-input-container {
                         max-width: 720px;
-                        bottom: 100px !important;
+                        bottom: 40px !important;
                     }
                 }
                 @media (min-width: 1024px) {
                     .chat-input-container {
                         max-width: 900px;
-                        bottom: 100px !important;
+                        bottom: 40px !important;
                     }
                 }
                 @media (min-width: 1400px) {
@@ -63,14 +77,14 @@ const ChatInput = ({ onSend, disabled }) => {
                 className="chat-input-container"
                 style={{
                     position: 'fixed',
-                    bottom: '88px',
+                    bottom: '24px',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: 'calc(100% - 32px)',
                     maxWidth: '800px',
-                    padding: '6px 6px 6px 20px',
+                    padding: '8px 8px 8px 20px',
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-end', // Changed for multiline
                     gap: '12px',
                     zIndex: 101,
                     background: isFocused
@@ -78,7 +92,7 @@ const ChatInput = ({ onSend, disabled }) => {
                         : 'rgba(255, 255, 255, 0.85)',
                     backdropFilter: 'blur(40px) saturate(180%)',
                     WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-                    borderRadius: '28px',
+                    borderRadius: '24px', // Adjusted border radius
                     border: isFocused
                         ? '1.5px solid rgba(135, 169, 107, 0.4)'
                         : '1px solid rgba(0, 0, 0, 0.06)',
@@ -97,22 +111,24 @@ const ChatInput = ({ onSend, disabled }) => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    marginBottom: '6px' // Align with textarea
                 }}>
                     <Sparkles size={14} color="var(--color-sage-green)" />
                 </div>
 
-                {/* Input Field */}
-                <input
-                    type="text"
+                {/* Textarea Field */}
+                <textarea
+                    ref={textareaRef}
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     placeholder={disabled ? "EcoPulse AI is thinking..." : "Ask the Green Sentinel..."}
                     disabled={disabled}
                     className="chat-input-field"
+                    rows={1}
                     style={{
                         border: 'none',
                         background: 'transparent',
@@ -122,7 +138,11 @@ const ChatInput = ({ onSend, disabled }) => {
                         fontWeight: '500',
                         color: 'var(--color-charcoal)',
                         letterSpacing: '-0.01em',
-                        padding: '12px 0'
+                        padding: '8px 0',
+                        resize: 'none',
+                        maxHeight: '150px', // Limit max height
+                        overflowY: 'auto',
+                        lineHeight: '1.5'
                     }}
                 />
 
@@ -132,9 +152,9 @@ const ChatInput = ({ onSend, disabled }) => {
                     disabled={!canSend}
                     className={canSend ? 'send-button-active' : ''}
                     style={{
-                        width: '44px',
-                        height: '44px',
-                        borderRadius: '22px',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '20px',
                         border: 'none',
                         background: canSend
                             ? 'linear-gradient(135deg, var(--color-sage-green) 0%, #5d7d4a 100%)'
@@ -146,11 +166,12 @@ const ChatInput = ({ onSend, disabled }) => {
                         cursor: canSend ? 'pointer' : 'default',
                         transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                         flexShrink: 0,
-                        boxShadow: canSend ? '0 4px 16px rgba(135, 169, 107, 0.3)' : 'none'
+                        boxShadow: canSend ? '0 4px 16px rgba(135, 169, 107, 0.3)' : 'none',
+                        marginBottom: '2px' // Align with textarea
                     }}
                 >
                     <Send
-                        size={18}
+                        size={16}
                         style={{
                             transform: 'rotate(-45deg)',
                             marginLeft: '2px',

@@ -13,6 +13,7 @@ import ProfileView from './ProfileView';
 import CreateEventModal from './CreateEventModal';
 import AddNeighborModal from './AddNeighborModal';
 import DashboardSkeleton from './DashboardSkeleton';
+import VoiceRoom from './VoiceRoom';
 
 import { chatService } from '../services/chatService';
 import { notificationsService } from '../services/notificationsService';
@@ -36,6 +37,8 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     // Modal States
     const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
     const [isAddNeighborOpen, setIsAddNeighborOpen] = useState(false);
+    const [isVoiceRoomOpen, setIsVoiceRoomOpen] = useState(false);
+    const [voiceRoomEvent, setVoiceRoomEvent] = useState(null);
 
     // Data State
     const [events, setEvents] = useState([]);
@@ -177,6 +180,19 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
             fetchDashboardData(); // Refresh
         } catch (error) {
             console.error('Failed to add neighbor:', error);
+        }
+    };
+
+    const handleCallClick = () => {
+        // Open voice room for current event if available
+        if (activeChatEvent) {
+            setVoiceRoomEvent(activeChatEvent);
+            setIsVoiceRoomOpen(true);
+        } else if (events.length > 0) {
+            setVoiceRoomEvent(events[0]);
+            setIsVoiceRoomOpen(true);
+        } else {
+            alert('No events available to join voice call');
         }
     };
 
@@ -548,10 +564,15 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
 
             {/* AI Interface & Nav */}
             <ChatInput onSend={handleSendMessage} disabled={isThinking} />
-            <BottomNavigation activeTab={viewMode} onTabChange={(tab) => {
-                if (tab === 'home') setViewMode('dashboard');
-                if (tab === 'profile') setViewMode('profile');
-            }} />
+            <BottomNavigation 
+                activeTab={viewMode} 
+                onTabChange={(tab) => {
+                    if (tab === 'home') setViewMode('dashboard');
+                    if (tab === 'profile') setViewMode('profile');
+                }} 
+                onCallClick={() => setIsVoiceRoomOpen(true)}
+            />
+            <VoiceRoom isOpen={isVoiceRoomOpen} onClose={() => setIsVoiceRoomOpen(false)} />
         </div>
     );
 };
