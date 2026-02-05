@@ -18,7 +18,8 @@ export default function VoiceRoom({ isOpen, onClose }) {
     const fetchUserLanguage = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const response = await fetch('http://127.0.0.1:8000/api/v1/users/me', {
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+        const response = await fetch(`${apiUrl}/api/v1/users/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'accept': 'application/json'
@@ -38,8 +39,9 @@ export default function VoiceRoom({ isOpen, onClose }) {
   async function join() {
     if (!roomId.trim()) return alert("Enter room ID");
 
+    const wsUrl = import.meta.env.VITE_WS_BASE_URL || 'ws://127.0.0.1:8000';
     const ws = new WebSocket(
-      `ws://127.0.0.1:8000/api/v1/voice/voice/ws/${roomId}/${userLang}`
+      `${wsUrl}/api/v1/voice/ws/${roomId}/${userLang}`
     );
     ws.binaryType = "arraybuffer";
     socketRef.current = ws;
