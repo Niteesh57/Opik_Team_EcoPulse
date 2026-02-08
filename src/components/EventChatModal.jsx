@@ -590,7 +590,6 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                         background: 'white',
                         borderTop: '1px solid rgba(0,0,0,0.06)',
                         display: 'flex',
-                        gap: '10px',
                         alignItems: 'center'
                     }}
                 >
@@ -604,7 +603,7 @@ const EventChatModal = ({ isOpen, onClose, eventId, eventName, currentUser }) =>
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                padding: '12px 16px',
+                                padding: '12px 50px 12px 16px',
                                 borderRadius: '24px',
                                 background: '#F8F9FA',
                                 border: '1px solid transparent',

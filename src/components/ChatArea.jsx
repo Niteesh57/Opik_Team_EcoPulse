@@ -10,10 +10,31 @@ const STREAMING_MARKDOWN_COMPONENTS = {
     p: ({ children }) => <p className="streaming-p">{children}</p>
 };
 
-const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage, waitingForUser }) => {
+const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessage, waitingForUser, onSend }) => {
     const messagesEndRef = useRef(null);
     const [feedbackStates, setFeedbackStates] = useState({});
     const [feedbackLoading, setFeedbackLoading] = useState({});
+    const lastStreamingMessage = useRef('');
+
+    // Identify active tool for context
+    const activeToolStep = toolSteps?.find(s => s.loading);
+
+    // Keep track of the last streaming message to prevent flicker on stream end
+    useEffect(() => {
+        if (streamingMessage) {
+            lastStreamingMessage.current = streamingMessage;
+        }
+    }, [streamingMessage]);
+
+    // Clear the last streaming message when a new message is added to the array
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg.role === 'assistant' && (lastMsg.content || lastMsg.ai_message)) {
+                lastStreamingMessage.current = '';
+            }
+        }
+    }, [messages]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -75,25 +96,18 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
         }
     };
 
-    const lastMessageRef = useRef();
-    useEffect(() => {
-      lastMessageRef.current = messages;
-    });
-    const renderedMessages = streamingMessage ? lastMessageRef.current : messages;
-
-
     return (
         <div style={{
             flex: 1,
             overflowY: 'auto',
             padding: '24px',
-            paddingBottom: '120px', // Space for input
+            paddingBottom: '180px', // Space for input and bottom navigation
             display: 'flex',
             flexDirection: 'column',
             gap: '24px'
         }} className="no-scrollbar">
 
-            {renderedMessages.length === 0 && !loading && !streamingMessage ? (
+            {messages.length === 0 && !loading && !streamingMessage ? (
                 <div style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -115,7 +129,7 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                 </div>
             ) : (
                 <>
-                    {renderedMessages
+                    {messages
                         .filter(msg => (msg.content || msg.user_message || msg.ai_message)) // FIX: Don't render empty messages
                         .map((msg, idx) => (
                         <div key={msg.id || idx} className="message-item" style={{
@@ -349,21 +363,20 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                         </div>
                     ))}
 
-                    {/* AI Processing Indicator - Glassy Animated Design */}
-                    {((toolSteps && toolSteps.length > 0) || statusMessage) && (
-                        <AIProcessingIndicator
-                            isProcessing={loading}
-                            statusMessage={statusMessage}
-                            activeTool={toolSteps?.find(s => s.loading)}
-                            completedTools={toolSteps?.filter(s => !s.loading).map(s => s.description) || []}
-                        />
-                    )}
+                        {/* AI Processing Indicator - Glassy Animated Design */}
+                        {((toolSteps && toolSteps.length > 0) || statusMessage) && (
+                            <AIProcessingIndicator
+                                isProcessing={loading}
+                                statusMessage={statusMessage}
+                                activeTool={toolSteps?.find(s => s.loading)}
+                                completedTools={toolSteps?.filter(s => !s.loading).map(s => s.description) || []}
+                            />
+                        )}
 
-                    {/* FIXED: Unified AI Response Area */}
-                    {/* Logic changed: Always show if we have text (streamingMessage), 
-                otherwise only show loading dots if there is NO status message */}
-                    {(streamingMessage || (loading && !statusMessage)) && (
-                        <div className="streaming-container" style={{
+                        {/* FIXED: Unified AI Response Area */}
+                        {/* Show streaming bubble if we have content OR if we're still streaming (prevents flicker) */}
+                        {((streamingMessage || lastStreamingMessage.current) || (loading && !statusMessage && !waitingForUser)) && (
+                            <div className="streaming-container" style={{
                             display: 'flex',
                             gap: '14px',
                             alignItems: 'flex-start',
@@ -398,13 +411,13 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                 letterSpacing: '-0.01em',
                                 transition: 'all 0.3s ease'
                             }}>
-                                {streamingMessage ? (
+                                {(streamingMessage || lastStreamingMessage.current) ? (
                                     <div className="markdown-content">
                                         {/* Use the constant defined outside for better performance */}
                                         <ReactMarkdown components={STREAMING_MARKDOWN_COMPONENTS}>
-                                            {streamingMessage}
+                                            {streamingMessage || lastStreamingMessage.current}
                                         </ReactMarkdown>
-                                        <span className="streaming-cursor">▍</span>
+                                        {streamingMessage && <span className="streaming-cursor">▍</span>}
                                     </div>
                                 ) : (
                                     /* Loading dots (only visible if no status message) */
@@ -447,15 +460,91 @@ const ChatArea = ({ messages, loading, streamingMessage, toolSteps, statusMessag
                                     Your input is needed
                                 </span>
                             </div>
-                            <p style={{
-                                margin: 0,
-                                fontSize: '13px',
+                            
+                            <div style={{
                                 color: 'var(--color-charcoal)',
                                 opacity: 0.8,
-                                lineHeight: '1.5'
+                                lineHeight: '1.5',
+                                fontSize: '13px'
                             }}>
-                                {waitingForUser.question || 'Please type your response below to continue the conversation...'}
-                            </p>
+                                {waitingForUser.question ? (
+                                    <p style={{ margin: 0 }}>{waitingForUser.question}</p>
+                                ) : activeToolStep ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <p style={{ margin: 0, fontWeight: '500' }}>
+                                            {activeToolStep.description || 'Processing your request...'}
+                                        </p>
+                                        {activeToolStep.args && Object.keys(activeToolStep.args).length > 0 && (
+                                            <div style={{
+                                                fontSize: '12px',
+                                                background: 'rgba(255,255,255,0.5)',
+                                                padding: '6px 10px',
+                                                borderRadius: '8px',
+                                                marginTop: '4px'
+                                            }}>
+                                                <span style={{ opacity: 0.7 }}>Context provided so far: </span>
+                                                {Object.entries(activeToolStep.args).map(([key, val]) => (
+                                                    <span key={key} style={{ fontWeight: '500', marginLeft: '4px' }}>
+                                                        {key.replace(/_/g, ' ')}: {val}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p style={{ margin: 0 }}>Please type your response below to continue the conversation...</p>
+                                )}
+                            </div>
+
+                            {/* Suggestions / Hints */}
+                            {waitingForUser.suggestions && (
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                                    {Array.isArray(waitingForUser.suggestions) ? (
+                                        waitingForUser.suggestions.map((suggestion, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => onSend && onSend(suggestion)}
+                                                style={{
+                                                    background: 'white',
+                                                    border: '1px solid var(--color-sage-green)',
+                                                    borderRadius: '20px',
+                                                    padding: '8px 16px',
+                                                    fontSize: '13px',
+                                                    color: 'var(--color-sage-green)',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.background = 'var(--color-sage-green)';
+                                                    e.currentTarget.style.color = 'white';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.background = 'white';
+                                                    e.currentTarget.style.color = 'var(--color-sage-green)';
+                                                }}
+                                            >
+                                                {suggestion}
+                                                <span style={{ fontSize: '10px' }}>➜</span>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div style={{
+                                            fontSize: '12px',
+                                            color: 'var(--color-text-secondary)',
+                                            background: 'rgba(255,255,255,0.5)',
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            fontStyle: 'italic'
+                                        }}>
+                                            Hint: {waitingForUser.suggestions}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div style={{
                                 display: 'flex',
                                 alignItems: 'center',

@@ -2,7 +2,8 @@ import React from 'react';
 import { Sparkles, Zap, Brain, Cpu, CheckCircle2 } from 'lucide-react';
 
 const AIProcessingIndicator = ({ isProcessing, statusMessage, activeTool, completedTools = [] }) => {
-    if (!isProcessing && completedTools.length === 0) return null;
+    // Show if processing, OR if we have completed tools, OR if we have an active tool (even if paused/waiting)
+    if (!isProcessing && completedTools.length === 0 && !activeTool) return null;
 
     return (
         <>

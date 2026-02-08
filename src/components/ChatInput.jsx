@@ -45,13 +45,13 @@ const ChatInput = ({ onSend, disabled }) => {
                 @media (min-width: 768px) {
                     .chat-input-container {
                         max-width: 720px;
-                        bottom: 40px !important;
+                        bottom: 100px !important;
                     }
                 }
                 @media (min-width: 1024px) {
                     .chat-input-container {
                         max-width: 900px;
-                        bottom: 40px !important;
+                        bottom: 100px !important;
                     }
                 }
                 @media (min-width: 1400px) {
@@ -77,7 +77,7 @@ const ChatInput = ({ onSend, disabled }) => {
                 className="chat-input-container"
                 style={{
                     position: 'fixed',
-                    bottom: '24px',
+                    bottom: '100px',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: 'calc(100% - 32px)',

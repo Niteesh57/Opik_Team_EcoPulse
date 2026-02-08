@@ -53,6 +53,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     const [messages, setMessages] = useState([]);
     const [streamingContent, setStreamingContent] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    const [waitingForUser, setWaitingForUser] = useState(null);
 
     // Tool Activity State for real-time visualization
     const [toolActivity, setToolActivity] = useState({
@@ -94,7 +95,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         };
 
         checkNotifications();
-        const interval = setInterval(checkNotifications, 30000);
+        const interval = setInterval(checkNotifications, 100000);
         return () => clearInterval(interval);
     }, []);
 
@@ -214,6 +215,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
         setViewMode('chat');
         setIsThinking(true);
         setStreamingContent('');
+        setWaitingForUser(null);
 
         // Reset tool activity
         setToolActivity({
@@ -225,6 +227,8 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
 
         const optimisticMsg = { role: 'user', user_message: text, id: Date.now() };
         setMessages(prev => [...prev, optimisticMsg]);
+
+        let isInterrupted = false;
 
         try {
             let threadId = currentSession?.session_id;
@@ -269,23 +273,28 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                         setStreamingContent(prev => prev + chunk);
                     },
                     onWaitForUser: (data) => {
+                        isInterrupted = true;
                         setIsThinking(false);
-                        setToolActivity({
-                            status: null,
-                            statusMessage: '',
-                            activeTool: null,
-                            completedTools: []
+                        setWaitingForUser({
+                            question: data.question,
+                            sessionId: data.sessionId,
+                            suggestions: data.expected // Capture suggestions/format
                         });
+                        // Preserve tool state
                     },
                     onComplete: (finalData) => {
                         setIsThinking(false);
                         setStreamingContent('');
-                        setToolActivity({
-                            status: null,
-                            statusMessage: '',
-                            activeTool: null,
-                            completedTools: []
-                        });
+                        
+                        if (!isInterrupted) {
+                            setToolActivity({
+                                status: null,
+                                statusMessage: '',
+                                activeTool: null,
+                                completedTools: []
+                            });
+                        }
+
                         if (finalData.sessionId) {
                             loadMessages(finalData.sessionId);
                         } else if (threadId) {
@@ -295,12 +304,14 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                     onError: (err) => {
                         console.error('Streaming error', err);
                         setIsThinking(false);
-                        setToolActivity({
-                            status: null,
-                            statusMessage: '',
-                            activeTool: null,
-                            completedTools: []
-                        });
+                        if (!isInterrupted) {
+                            setToolActivity({
+                                status: null,
+                                statusMessage: '',
+                                activeTool: null,
+                                completedTools: []
+                            });
+                        }
                         setMessages(prev => [...prev, {
                             role: 'assistant',
                             ai_message: `Error: ${err.message || "I'm having trouble connecting right now. Please try again."}`
@@ -546,6 +557,8 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                     messages={messages}
                     loading={isThinking}
                     streamingMessage={streamingContent}
+                    waitingForUser={waitingForUser}
+                    onSend={handleSendMessage}
                     toolSteps={[
                         // Add completed tools
                         ...toolActivity.completedTools.map(tool => ({
@@ -555,6 +568,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
                         // Add active tool if any
                         ...(toolActivity.activeTool ? [{
                             description: toolActivity.activeTool.description || toolActivity.activeTool.name,
+                            args: toolActivity.activeTool.args,
                             loading: true
                         }] : [])
                     ]}
