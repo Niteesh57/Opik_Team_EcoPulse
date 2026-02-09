@@ -177,7 +177,7 @@ const UserDashboard = ({ userName = "Alex", onLogout }) => {
     const handleAddNeighbor = async (userId) => {
         try {
             await neighborsService.addNeighbor(userId);
-            alert("Friend request sent!");
+            alert("Neighbor added!");
             fetchDashboardData(); // Refresh
         } catch (error) {
             console.error('Failed to add neighbor:', error);
